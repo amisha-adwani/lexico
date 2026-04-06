@@ -1,35 +1,24 @@
-import { useMemo, useState } from 'react';
-import AppLayout from './components/layout/AppLayout';
-import InputPanel from './components/panels/InputPanel';
-import OutputRenderer from './components/output/OutputRenderer';
-import { mockAiOutput } from './data/mockOutput';
+import logo from './logo.svg';
+import './App.css';
 
 function App() {
-  const [inputText, setInputText] = useState('');
-  const [outputBlocks, setOutputBlocks] = useState(mockAiOutput);
-
-  const title = useMemo(() => {
-    if (!inputText.trim()) {
-      return 'Ready to simplify';
-    }
-    return 'Simplification preview';
-  }, [inputText]);
-
-  const handleSimplify = () => {
-    setOutputBlocks(mockAiOutput);
-  };
-
   return (
-    <AppLayout
-      inputPanel={
-        <InputPanel
-          value={inputText}
-          onChange={setInputText}
-          onSimplify={handleSimplify}
-        />
-      }
-      outputPanel={<OutputRenderer blocks={outputBlocks} title={title} />}
-    />
+    <div className="App">
+      <header className="App-header">
+        <img src={logo} className="App-logo" alt="logo" />
+        <p>
+          Edit <code>src/App.js</code> and save to reload.
+        </p>
+        <a
+          className="App-link"
+          href="https://reactjs.org"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Learn React
+        </a>
+      </header>
+    </div>
   );
 }
 
