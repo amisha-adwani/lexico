@@ -1,4 +1,6 @@
-function InputPanel({ value, onChange, onSimplify }) {
+function InputPanel({ value, onChange, onSimplify, isLoading }) {
+  const isDisabled = isLoading || !value.trim();
+
   return (
     <div className="flex h-full min-h-[480px] flex-col">
       <div className="mb-4">
@@ -19,9 +21,10 @@ function InputPanel({ value, onChange, onSimplify }) {
         <button
           type="button"
           onClick={onSimplify}
-          className="rounded-xl bg-gradient-to-r from-brand-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:brightness-105"
+          disabled={isDisabled}
+          className="rounded-xl bg-gradient-to-r from-brand-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Simplify with AI
+          {isLoading ? 'Analyzing...' : 'Simplify with AI'}
         </button>
       </div>
     </div>
