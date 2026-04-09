@@ -34,9 +34,11 @@ function OutputRenderer({ blocks, title }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {blocks.map((block, index) => {
           const kind = getBlockKind(block.type);
-          const isHeavy = kind === 'hero' || kind === 'warning';
-          const isFlow = kind === 'flow';
-          const spanClass = isHeavy || isFlow ? 'lg:col-span-2' : 'lg:col-span-1';
+          const isHeavy =
+            kind === 'key_point' ||
+            kind === 'warning' ||
+            kind === 'visual';
+          const spanClass = isHeavy ? 'lg:col-span-2' : 'lg:col-span-1';
 
           return (
             <div key={`${block.type || 'block'}-${index}`} className={spanClass}>

@@ -24,7 +24,7 @@ function ExplainMoreText({ text, previewChars = 180 }) {
           onClick={() => setExpanded((state) => !state)}
           className="mt-2 text-xs font-semibold text-brand-600 transition hover:text-brand-500"
         >
-          {expanded ? 'Show Less' : 'Explain More'}
+          {expanded ? 'Collapse' : 'Expand'}
         </button>
       )}
     </div>
