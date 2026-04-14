@@ -9,6 +9,14 @@
 /.pnp
 .pnp.js
 
+node_modules/
+build/
+dist/
+
+# extension build files
+my-extension/static/
+*.map
+
 # testing
 /coverage
 
