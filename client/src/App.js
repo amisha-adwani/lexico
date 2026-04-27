@@ -5,9 +5,11 @@ import OutputRenderer from './components/output/OutputRenderer';
 
 function App() {
   const [inputText, setInputText] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [outputBlocks, setOutputBlocks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const hasInput = Boolean(inputText.trim() || selectedFile);
 
   const title = useMemo(() => {
     if (isLoading) {
@@ -16,27 +18,42 @@ function App() {
     if (errorMessage) {
       return errorMessage;
     }
-    if (!inputText.trim()) {
+    if (!hasInput) {
       return 'Ready to simplify';
     }
     return 'Analysis and summary';
-  }, [inputText, isLoading, errorMessage]);
+  }, [hasInput, isLoading, errorMessage]);
 
   const handleSimplify = async () => {
     const trimmedText = inputText.trim();
-    if (!trimmedText || isLoading) return;
+    if ((!trimmedText && !selectedFile) || isLoading) return;
 
     setIsLoading(true);
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/simplify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: trimmedText }),
-      });
+      let response;
+
+      if (selectedFile) {
+        const payload = new FormData();
+        payload.append('file', selectedFile);
+        if (trimmedText) {
+          payload.append('text', trimmedText);
+        }
+
+        response = await fetch('/api/simplify', {
+          method: 'POST',
+          body: payload,
+        });
+      } else {
+        response = await fetch('/api/simplify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: trimmedText }),
+        });
+      }
 
       const data = await response.json();
 
@@ -65,6 +82,8 @@ function App() {
         <InputPanel
           value={inputText}
           onChange={setInputText}
+          selectedFile={selectedFile}
+          onFileSelect={setSelectedFile}
           onSimplify={handleSimplify}
           isLoading={isLoading}
         />
