@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import AppLayout from './components/layout/AppLayout';
 import InputPanel from './components/panels/InputPanel';
 import OutputRenderer from './components/output/OutputRenderer';
+import { exportBlocksToPdf } from './utils/pdfExport';
 
 function App() {
   const [inputText, setInputText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [outputBlocks, setOutputBlocks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const hasInput = Boolean(inputText.trim() || selectedFile);
 
@@ -88,7 +90,14 @@ function App() {
           isLoading={isLoading}
         />
       }
-      outputPanel={<OutputRenderer blocks={outputBlocks} title={title} />}
+      outputPanel={
+        <OutputRenderer
+          blocks={outputBlocks}
+          title={title}
+          onExport={exportBlocksToPdf}
+          isExporting={isExporting}
+        />
+      }
     />
   );
 }

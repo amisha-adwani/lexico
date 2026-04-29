@@ -1,4 +1,7 @@
+import { useRef } from 'react';
+
 function InputPanel({ value, onChange, selectedFile, onFileSelect, onSimplify, isLoading }) {
+  const fileInputRef = useRef(null);
   const hasText = Boolean(value.trim());
   const hasFile = Boolean(selectedFile);
   const isDisabled = isLoading || (!hasText && !hasFile);
@@ -6,6 +9,13 @@ function InputPanel({ value, onChange, selectedFile, onFileSelect, onSimplify, i
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] || null;
     onFileSelect(file);
+  };
+
+  const handleRemoveFile = () => {
+    onFileSelect(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -32,6 +42,7 @@ function InputPanel({ value, onChange, selectedFile, onFileSelect, onSimplify, i
           Upload file (PDF, TXT, DOCX)
         </label>
         <input
+          ref={fileInputRef}
           id="source-file"
           type="file"
           accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -39,9 +50,22 @@ function InputPanel({ value, onChange, selectedFile, onFileSelect, onSimplify, i
           className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-300"
           disabled={isLoading}
         />
+        <div>
         <p className="mt-2 text-xs text-slate-500">
           {hasFile ? `Selected: ${selectedFile.name}` : 'No file selected'}
+          {hasFile && (
+          <button
+            type="button"
+            onClick={handleRemoveFile}
+            disabled={isLoading}
+            className="m-2 text-xs font-medium text-red-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            x
+          </button>
+        )}
         </p>
+        
+        </div>
       </div>
 
       <div className="mt-4 flex justify-end">

@@ -1,6 +1,6 @@
 import BlockRenderer, { getBlockKind } from './BlockRenderer';
 
-function OutputRenderer({ blocks, title }) {
+function OutputRenderer({ blocks, title, onExport, isExporting }) {
   if (!blocks || blocks.length === 0) {
     return (
       <section className="flex h-full min-h-[480px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
@@ -26,9 +26,19 @@ function OutputRenderer({ blocks, title }) {
 
   return (
     <section>
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-slate-900">Output</h2>
-        <p className="text-sm text-slate-500">{title}</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Output</h2>
+          <p className="text-sm text-slate-500">{title}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={isExporting}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isExporting ? 'Exporting...' : 'Export PDF'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -41,7 +51,12 @@ function OutputRenderer({ blocks, title }) {
           const spanClass = isHeavy ? 'lg:col-span-2' : 'lg:col-span-1';
 
           return (
-            <div key={`${block.type || 'block'}-${index}`} className={spanClass}>
+            <div
+              key={`${block.type || 'block'}-${index}`}
+              className={spanClass}
+              data-export-chart={kind === 'visual' ? 'true' : 'false'}
+              data-chart-title={block?.title || `Chart ${index + 1}`}
+            >
               <BlockRenderer block={block} />
             </div>
           );
