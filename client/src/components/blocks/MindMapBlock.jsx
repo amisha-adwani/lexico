@@ -14,19 +14,7 @@ function getRadialPosition(index, total, radius) {
 function MindMapBlock({ data }) {
   const graph = useMemo(() => {
     const nodesInput = Array.isArray(data?.nodes) ? data.nodes : [];
-    const rootLabel = nodesInput[0]?.label || data?.title || 'Main Idea';
-    const children = [];
-
-    nodesInput.forEach((entry) => {
-      if (!Array.isArray(entry?.children)) return;
-      entry.children.forEach((child) => {
-        if (typeof child === 'string' && child.trim()) {
-          children.push(child.trim());
-        }
-      });
-    });
-
-    const uniqueChildren = Array.from(new Set(children));
+    const rootLabel = data?.title || 'Main Idea';
     const rootId = 'mindmap-root';
 
     const flowNodes = [
@@ -46,18 +34,24 @@ function MindMapBlock({ data }) {
     ];
 
     const flowEdges = [];
+    const parentRadius = 280;
+    const childRadius = 160;
 
-    uniqueChildren.forEach((label, index) => {
-      const id = `mindmap-child-${index}`;
-      const position = getRadialPosition(index, uniqueChildren.length, 180);
+    const validParents = nodesInput.filter(
+      (entry) => entry && typeof entry.label === 'string' && Array.isArray(entry.children)
+    );
+
+    validParents.forEach((entry, parentIndex) => {
+      const parentId = `mindmap-parent-${parentIndex}`;
+      const parentPos = getRadialPosition(parentIndex, validParents.length, parentRadius);
 
       flowNodes.push({
-        id,
-        data: { label },
-        position,
+        id: parentId,
+        data: { label: entry.label.trim() || `Category ${parentIndex + 1}` },
+        position: parentPos,
         style: {
           borderRadius: 14,
-          border: '1px solid #bfdbfe',
+          border: '1px solid #7dd3fe',
           background: '#ffffff',
           padding: 8,
           color: '#1e293b',
@@ -65,11 +59,51 @@ function MindMapBlock({ data }) {
       });
 
       flowEdges.push({
-        id: `edge-${rootId}-${id}`,
+        id: `edge-${rootId}-${parentId}`,
         source: rootId,
-        target: id,
+        target: parentId,
         animated: true,
         style: { stroke: '#60a5fa' },
+      });
+
+      const childLabels = entry.children
+        .filter((child) => typeof child === 'string' && child.trim())
+        .map((child) => child.trim());
+
+      const parentAngle = (Math.PI * 2 * parentIndex) / validParents.length;
+      const spreadRange = Math.PI * 0.6; // 108° arc
+      const startAngle = parentAngle - spreadRange / 2;
+
+      childLabels.forEach((childLabel, childIndex) => {
+        const childAngle = childLabels.length === 1
+          ? parentAngle
+          : startAngle + (spreadRange / (childLabels.length - 1)) * childIndex;
+        const childPos = {
+          x: parentPos.x + Math.cos(childAngle) * childRadius,
+          y: parentPos.y + Math.sin(childAngle) * childRadius,
+        };
+        const childId = `mindmap-child-${parentIndex}-${childIndex}`;
+
+        flowNodes.push({
+          id: childId,
+          data: { label: childLabel },
+          position: childPos,
+          style: {
+            borderRadius: 12,
+            border: '1px solid #e2e8f0',
+            background: '#fbfbff',
+            padding: 6,
+            color: '#334155',
+          },
+        });
+
+        flowEdges.push({
+          id: `edge-${parentId}-${childId}`,
+          source: parentId,
+          target: childId,
+          animated: true,
+          style: { stroke: '#93c5fd' },
+        });
       });
     });
 

@@ -1,5 +1,32 @@
-export default function buildPrompt({ text, language }) {
+export default function buildPrompt({ text, language, visualSkeleton }) {
     const languageLine = language ? `Language: ${language}\n` : "";
+    const skeletonLine = visualSkeleton ? `VISUAL STRUCTURE TEMPLATE:\n${JSON.stringify(visualSkeleton, null, 2)}\n\nYou are a content extraction assistant. You will receive a JSON structure and a block of text. Fill in the JSON fields with relevant content from the text. Never change the JSON shape, never add or remove keys. Fill in the following visual structure with relevant labels and content from the text. Do not change the structure shape.\n\n` : "";
+  
+    if (visualSkeleton) {
+      return `
+  You are a content extraction assistant. You will receive a JSON structure and a block of text. Fill in the JSON fields with relevant content from the text. Never change the JSON shape, never add or remove keys.
+  
+  VISUAL STRUCTURE TEMPLATE:
+  ${JSON.stringify(visualSkeleton, null, 2)}
+  
+  Fill in the labels and content fields in this structure with relevant information from the text. Do not change the structure shape, keys, or add/remove fields.
+  IMPORTANT: The nodes array must contain EXACTLY the same number of nodes as the template above — do not add more nodes.
+  
+  Return an array of blocks, including exactly one 'visual' block that is the filled structure above, and other blocks as usual.
+  
+  CRITICAL RULES:
+  - Return ONLY valid JSON array
+  - Do NOT include markdown (no \`\`\`)
+  - Do NOT include explanations or extra text
+  - Output must be directly JSON.parse-able
+  - Return an array with 3 to 7 blocks
+  - The 'visual' block must be the filled template
+  
+  ${languageLine}
+  TEXT:
+  ${text}
+  `;
+    }
   
     return `
   You are an assistant that converts complex text into structured, visual-first content blocks for a dynamic UI.
@@ -86,6 +113,7 @@ export default function buildPrompt({ text, language }) {
       }
     ]
   }
+  For mindmap, the nodes array must be a maximum of 3-5 TOP LEVEL nodes only. Each top level node has children as strings. Do NOT repeat sub-categories as separate top-level nodes. Wrong: 14 flat nodes all at same level. Correct: 3-5 parent nodes each with 2-5 string children.
   
   For "comparison":
   {

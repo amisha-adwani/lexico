@@ -3,12 +3,12 @@ import buildPrompt from "../utils/buildPrompt.js";
 import cleanJSON from "../utils/cleanJSON.js";
 import normalizeBlocks from "../utils/normalizeBlocks.js";
 
-export async function simplifyText({ text, language }) {
+export async function simplifyText({ text, language, visualSkeleton }) {
   if (!client?.generateContent) {
     throw new Error("AI client is not configured correctly");
   }
 
-  const prompt = buildPrompt({ text, language });
+  const prompt = buildPrompt({ text, language, visualSkeleton });
 
   const raw = await client.generateContent(prompt);
 
