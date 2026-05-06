@@ -96,6 +96,9 @@ function App() {
           title={title}
           onExport={exportBlocksToPdf}
           isExporting={isExporting}
+          isLoading={isLoading}
+          inputText={inputText}
+          selectedFile={selectedFile}
         />
       }
     />
