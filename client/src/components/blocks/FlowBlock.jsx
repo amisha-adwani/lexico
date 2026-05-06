@@ -6,7 +6,13 @@ function FlowBlock({ data }) {
       : [];
 
   return (
-    <article className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      data-export-chart="true"
+      data-chart-title={data?.title || 'Process Flow'}
+      data-visual-type="flow"
+      data-visual-json={JSON.stringify({ ...data, visualType: 'flow' })}
+    >
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-700">Flow</p>
       <h3 className="mb-4 text-base font-semibold text-slate-900">{data?.title || 'Process Flow'}</h3>
 

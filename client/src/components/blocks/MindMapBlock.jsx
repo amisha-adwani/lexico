@@ -111,7 +111,13 @@ function MindMapBlock({ data }) {
   }, [data]);
 
   return (
-    <article className="rounded-2xl border border-sky-200 bg-sky-50/50 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className="rounded-2xl border border-sky-200 bg-sky-50/50 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      data-export-chart="true"
+      data-chart-title={data?.title || 'Concept Map'}
+      data-visual-type="mindmap"
+      data-mindmap-json={JSON.stringify(data)}
+    >
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-700">Mind Map</p>
       <h3 className="mb-4 text-base font-semibold text-slate-900">{data?.title || 'Concept Map'}</h3>
 

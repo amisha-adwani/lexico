@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-function ExplainMoreText({ text, previewChars = 180 }) {
+function ExplainMoreText({ text, previewChars = 185 }) {
   const [expanded, setExpanded] = useState(false);
 
   const shouldCollapse = text && text.length > previewChars;

@@ -1,14 +1,12 @@
 import BlockRenderer, { getBlockKind } from './BlockRenderer';
+import SkeletonBlock from '../blocks/SkeletonBlock';
 
-function OutputRenderer({ blocks, title, onExport, isExporting }) {
-  if (!blocks || blocks.length === 0) {
+function OutputRenderer({ blocks, title, onExport, isExporting, isLoading, inputText, selectedFile }) {
+  if (isLoading) {
     return (
-      <section className="flex h-full min-h-[480px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">No output yet</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            AI-generated simplification blocks will appear here.
-          </p>
+      <section className="flex h-full min-h-[480px] items-center justify-center">
+        <div className="w-full max-w-2xl">
+          <SkeletonBlock height="h-[400px]" />
         </div>
       </section>
     );
@@ -33,7 +31,7 @@ function OutputRenderer({ blocks, title, onExport, isExporting }) {
         </div>
         <button
           type="button"
-          onClick={onExport}
+          onClick={() => onExport({ blocks, inputText, selectedFile })}
           disabled={isExporting}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -54,8 +52,6 @@ function OutputRenderer({ blocks, title, onExport, isExporting }) {
             <div
               key={`${block.type || 'block'}-${index}`}
               className={spanClass}
-              data-export-chart={kind === 'visual' ? 'true' : 'false'}
-              data-chart-title={block?.title || `Chart ${index + 1}`}
             >
               <BlockRenderer block={block} />
             </div>

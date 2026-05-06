@@ -37,7 +37,13 @@ function ComparisonBlock({ data }) {
       : [];
 
   return (
-    <article className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      data-export-chart="true"
+      data-chart-title={data?.title || 'Side-by-side view'}
+      data-visual-type="comparison"
+      data-visual-json={JSON.stringify({ ...data, visualType: 'comparison' })}
+    >
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-violet-600">
         Comparison
       </p>

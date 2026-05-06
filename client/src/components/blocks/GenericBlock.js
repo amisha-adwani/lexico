@@ -8,7 +8,7 @@ function GenericBlock({ block }) {
       : 'No content available.';
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 transition duration-200 hover:shadow-sm">
+    <article data-export-text="true" className="rounded-xl border border-slate-200 bg-white p-4 transition duration-200 hover:shadow-sm">
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
         {block.type || 'unknown'}
       </p>

@@ -2,7 +2,13 @@ function TimelineBlock({ data }) {
   const points = Array.isArray(data?.points) ? data.points : [];
 
   return (
-    <article className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-md"
+      data-export-chart="true"
+      data-chart-title={data?.title || 'Timeline Overview'}
+      data-visual-type="timeline"
+      data-visual-json={JSON.stringify({ ...data, visualType: 'timeline' })}
+    >
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">Timeline</p>
       <h3 className="mb-4 text-base font-semibold text-slate-900">{data?.title || 'Timeline Overview'}</h3>
 

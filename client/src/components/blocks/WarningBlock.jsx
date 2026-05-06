@@ -2,7 +2,7 @@ import ExplainMoreText from './ExplainMoreText';
 
 function WarningBlock({ block }) {
   return (
-    <article className="group rounded-2xl border border-amber-300 bg-amber-50 p-5 shadow-soft transition duration-200 hover:shadow-md">
+    <article data-export-text="true" className="group rounded-2xl border border-amber-300 bg-amber-50 p-5 shadow-soft transition duration-200 hover:shadow-md">
       <div className="mb-2 flex items-center gap-2">
         <span className="text-lg" role="img" aria-label="warning">
           ⚠️
