@@ -1,5 +1,5 @@
 
-const model = process.env.MODEL || "inclusionai/ling-2.6-1t:free";
+const model = process.env.MODEL;
 const temperature = Number(process.env.TEMP) || 0.2;
 const endpoint = "https://openrouter.ai/api/v1/chat/completions";
 

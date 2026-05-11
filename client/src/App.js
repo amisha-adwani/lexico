@@ -43,12 +43,12 @@ function App() {
           payload.append('text', trimmedText);
         }
 
-        response = await fetch('/api/simplify', {
+        response = await fetch(`${process.env.REACT_APP_API_URL}/api/simplify`, {
           method: 'POST',
           body: payload,
         });
       } else {
-        response = await fetch('/api/simplify', {
+        response = await fetch(`${process.env.REACT_APP_API_URL}/api/simplify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

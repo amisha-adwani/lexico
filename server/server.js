@@ -8,7 +8,7 @@ import errorHandler from "./middleware/errorHandler.js";
 const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:3000"],
+  origin: ["http://localhost:3000", "https://lexico-bppw.onrender.com"],
 }));
 
 app.use(express.json({ limit: process.env.BODY_LIMIT || "2mb" }));
