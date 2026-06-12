@@ -40,12 +40,18 @@ export default function validateNodes(nodes, sourceMap = {}) {
       continue;
     }
 
-    const importance = clampImportance(node.importance !== undefined ? node.importance : 0.5);
-    if (node.importance === undefined || typeof node.importance !== 'number' || isNaN(node.importance)) {
-      repairLog.push(`Normalized importance for node ${node.id}`);
+    const originalImportance = node.importance;
+    const importance = clampImportance(originalImportance);
+    if (originalImportance !== importance) {
+      repairLog.push(
+        `Normalized importance for node ${node.id} from ${originalImportance === undefined ? 'undefined' : originalImportance} to ${importance}`
+      );
     }
 
-    const sourceRefs = validateSourceRefs(node.sourceRefs, sourceMap);
+    const sourceRefs = validateSourceRefs(node.sourceRefs, sourceMap, {
+      repairLog,
+      ownerDescription: `node ${node.id}`,
+    });
     if (sourceRefs.length === 0) {
       warnings.push(`Node ${node.id} has no valid sourceRefs`);
       continue;

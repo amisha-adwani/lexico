@@ -28,9 +28,24 @@ export default function validateRelations(relations, nodes = [], sourceMap = {})
       continue;
     }
 
+    const legacyMappings = [];
+    if (!relation.sourceNodeId && relation.from) {
+      legacyMappings.push('from→sourceNodeId');
+    }
+    if (!relation.targetNodeId && relation.to) {
+      legacyMappings.push('to→targetNodeId');
+    }
+    if (!relation.relationType && relation.type) {
+      legacyMappings.push('type→relationType');
+    }
+
     const sourceNodeId = relation.sourceNodeId || relation.from;
     const targetNodeId = relation.targetNodeId || relation.to;
     const relationType = relation.relationType || relation.type;
+
+    if (legacyMappings.length > 0) {
+      repairLog.push(`Migrated legacy relation fields for ${relation.id}: ${legacyMappings.join(', ')}`);
+    }
 
     if (!sourceNodeId || !nodeIds.has(sourceNodeId)) {
       warnings.push(`Relation ${relation.id}: invalid sourceNodeId ${sourceNodeId}`);

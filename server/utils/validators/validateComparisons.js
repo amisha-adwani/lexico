@@ -54,6 +54,10 @@ export default function validateComparisons(comparisons, nodes = [], sourceMap =
       return true;
     });
 
+    if (validItems.length > 0 && validItems.length !== comparison.items.length) {
+      repairLog.push(`Removed invalid items from comparison ${comparison.id}`);
+    }
+
     if (validItems.length === 0) {
       warnings.push(`Comparison ${comparison.id}: no valid items`);
       continue;

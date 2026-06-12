@@ -51,6 +51,10 @@ export default function validateSequences(sequences, nodes = [], sourceMap = {})
       return true;
     });
 
+    if (validNodeIds.length > 0 && validNodeIds.length !== sequence.nodeIds.length) {
+      repairLog.push(`Removed invalid node references from sequence ${sequence.id}`);
+    }
+
     if (validNodeIds.length === 0) {
       warnings.push(`Sequence ${sequence.id}: no valid node references`);
       continue;
