@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { simplifyText } from "../services/aiServices.js";
+import { simplifyText, generateCanonicalIR } from "../services/aiServices.js";
 import { extractTextFromFile, isAllowedUpload } from "../utils/extractTextFromFile.js";
 import classifyContent  from "../utils/classifyContent.js";
 import generateStructure  from "../utils/generateStructure.js";
@@ -98,6 +98,50 @@ router.post("/", handleUpload, async (req, res, next) => {
     }
 
     res.json({ blocks });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/canonical", handleUpload, async (req, res, next) => {
+  try {
+    const { text, language } = req.body;
+    const uploadedFile = req.file;
+    let sourceText = "";
+
+    if (uploadedFile) {
+      sourceText = await extractTextFromFile(uploadedFile);
+      if (!sourceText) {
+        return res.status(400).json({ error: "Could not extract text from uploaded file" });
+      }
+    } else if (typeof text === "string" && text.trim()) {
+      sourceText = text.trim();
+    }
+
+    if (!sourceText) {
+      return res.status(400).json({ error: "Text or file is required" });
+    }
+
+    const title = req.body.title;
+    const fingerprint = req.body.fingerprint;
+
+    const result = await generateCanonicalIR({ text: sourceText, documentTitle: title, sourceFingerprint: fingerprint, language });
+
+    if (!result || !result.success) {
+      return res.status(400).json({
+        error: result?.errorType || 'unknown_error',
+        message: result?.message || 'Failed to generate Canonical IR',
+        details: {
+          errors: result?.errors || [],
+          warnings: result?.warnings || [],
+          repairLog: result?.repairLog || [],
+          raw: result?.raw,
+          ir: result?.ir,
+        },
+      });
+    }
+
+    return res.json({ canonical: result.ir, errors: result.errors, warnings: result.warnings, repairLog: result.repairLog });
   } catch (err) {
     next(err);
   }
