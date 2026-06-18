@@ -4,6 +4,7 @@ import { simplifyText, generateCanonicalIR } from "../services/aiServices.js";
 import { extractTextFromFile, isAllowedUpload } from "../utils/extractTextFromFile.js";
 import classifyContent  from "../utils/classifyContent.js";
 import generateStructure  from "../utils/generateStructure.js";
+import transformCanonicalIR from "../utils/canonicalToViewModel.js";
 
 const router = express.Router();
 const upload = multer({
@@ -124,6 +125,7 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
 
     const title = req.body.title;
     const fingerprint = req.body.fingerprint;
+    const viewType = req.body.viewType || "generic";
 
     const result = await generateCanonicalIR({ text: sourceText, documentTitle: title, sourceFingerprint: fingerprint, language });
 
@@ -141,7 +143,9 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       });
     }
 
-    return res.json({ canonical: result.ir, errors: result.errors, warnings: result.warnings, repairLog: result.repairLog });
+    const viewModel = transformCanonicalIR(result.ir, viewType);
+
+    return res.json({ canonical: result.ir, viewModel, errors: result.errors, warnings: result.warnings, repairLog: result.repairLog });
   } catch (err) {
     next(err);
   }

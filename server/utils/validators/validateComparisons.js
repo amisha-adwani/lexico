@@ -38,21 +38,61 @@ export default function validateComparisons(comparisons, nodes = [], sourceMap =
       continue;
     }
 
-    const validItems = comparison.items.filter((item) => {
-      if (!item || typeof item !== 'object') {
-        warnings.push(`Comparison ${comparison.id}: skipped invalid item`);
-        return false;
-      }
-      if (!item.itemId || !nodeIds.has(item.itemId)) {
-        warnings.push(`Comparison ${comparison.id}: references non-existent item ${item?.itemId}`);
-        return false;
-      }
-      if (!item.name || typeof item.name !== 'string') {
-        warnings.push(`Comparison ${comparison.id}: item missing or invalid name`);
-        return false;
-      }
-      return true;
-    });
+    const validItems = comparison.items
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          warnings.push(`Comparison ${comparison.id}: skipped invalid item`);
+          return null;
+        }
+        if (!item.itemId || !nodeIds.has(item.itemId)) {
+          warnings.push(`Comparison ${comparison.id}: references non-existent item ${item?.itemId}`);
+          return null;
+        }
+        if (!item.name || typeof item.name !== 'string') {
+          warnings.push(`Comparison ${comparison.id}: item missing or invalid name`);
+          return null;
+        }
+
+        // NORMALIZE CRITERIA TO ARRAY
+        let criteria = item.criteria || [];
+        
+        // If criteria is a string, convert it to an array with a single criterion
+        if (typeof criteria === 'string') {
+          repairLog.push(
+            `Comparison ${comparison.id} item ${item.itemId}: converted string criteria to array`
+          );
+          criteria = [{ criterion: 'Description', value: criteria }];
+        }
+        
+        // Ensure criteria is an array
+        if (!Array.isArray(criteria)) {
+          repairLog.push(
+            `Comparison ${comparison.id} item ${item.itemId}: normalized criteria to array`
+          );
+          criteria = [];
+        }
+        
+        // Validate each criterion has proper structure
+        const validCriteria = criteria.map(crit => {
+          if (!crit || typeof crit !== 'object') {
+            warnings.push(
+              `Comparison ${comparison.id} item ${item.itemId}: invalid criterion object`
+            );
+            return null;
+          }
+          return {
+            criterion: crit.criterion || 'Property',
+            value: String(crit.value || ''),
+          };
+        }).filter(Boolean);
+
+        return {
+          itemId: item.itemId,
+          name: item.name,
+          criteria: validCriteria,
+        };
+      })
+      .filter(Boolean);
 
     if (validItems.length > 0 && validItems.length !== comparison.items.length) {
       repairLog.push(`Removed invalid items from comparison ${comparison.id}`);

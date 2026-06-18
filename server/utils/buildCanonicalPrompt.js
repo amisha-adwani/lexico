@@ -55,22 +55,79 @@ NODE SECTION:
 
 RELATION SECTION:
 - relations must be an array of relation objects.
-- Required relation fields: sourceNodeId, targetNodeId.
+- Required relation fields: id, sourceNodeId, targetNodeId.
+- id: unique relation identifier string, e.g. "r1".
 - relationType: optional, one of ${listValues(RELATION_TYPES)}.
 - Each relation connects two existing node ids.
+- For comparisons, use relationType "compared_to".
 
 SEQUENCE SECTION:
 - sequences must be an array of sequence objects.
 - Required sequence fields: id, type, label, nodeIds.
 - type should be one of ${listValues(SEQUENCE_TYPES)}.
 - nodeIds: ordered array of node ids in the sequence.
+- Include process and workflow sequences in addition to timelines.
 
-COMPARISON SECTION:
+COMPARISON SECTION - CRITICAL FOR RICH VIEWS:
 - comparisons must be an array of comparison objects.
-- Each comparison has id, label, and items.
-- items compare node ids using itemId, name, and criteria.
+- GENERATE COMPARISONS whenever content contains:
+  - vs, versus, alternatives, tradeoffs, compared to, comparison
+  - advantages vs disadvantages
+  - pros and cons
+  - different approaches to the same problem
+  - categories with different characteristics
+  - different implementations or options
+  
+- Examples that SHOULD generate comparisons:
+  - "State vs Props" in React
+  - "SQL vs NoSQL databases"
+  - "REST vs GraphQL"
+  - "Monolith vs Microservices"
+  
+- Structure of each comparison:
+  {
+    "id": "c1",
+    "label": "Name of the comparison (e.g., 'SQL vs NoSQL')",
+    "items": [
+      {
+        "itemId": "n2",
+        "name": "First item being compared",
+        "criteria": [
+          {
+            "criterion": "Performance",
+            "value": "High"
+          },
+          {
+            "criterion": "Scalability",
+            "value": "Excellent"
+          }
+        ]
+      },
+      {
+        "itemId": "n3",
+        "name": "Second item being compared",
+        "criteria": [
+          {
+            "criterion": "Performance",
+            "value": "Medium"
+          },
+          {
+            "criterion": "Scalability",
+            "value": "Good"
+          }
+        ]
+      }
+    ]
+  }
+
+- CRITICAL: criteria must ALWAYS be an array of objects, never a string.
+- Each criterion object must have "criterion" (property name) and "value" (value).
+- Include at least 2-3 criteria per item to make the comparison meaningful.
+- Can compare 2-5 items (use most important 5 if more).
+- Mark compared items with "compared_to" relations if appropriate.
 `;
 }
+
 
 function buildSourceChunkDefinitions({ chunks, sourceMap }) {
   return `SOURCE CHUNK DEFINITIONS:
@@ -95,11 +152,17 @@ function buildJsonContract() {
 
 Example structure:
 {
-  "document": { "schemaVersion": "${SCHEMA_VERSION}", "title": "...", "summary": "...", "language": "en", "sourceFingerprint": "..." },
-    "nodes": [
+  "document": { 
+    "schemaVersion": "${SCHEMA_VERSION}", 
+    "title": "...", 
+    "summary": "...", 
+    "language": "en", 
+    "sourceFingerprint": "..." 
+  },
+  "nodes": [
     {
       "id": "n1",
-      "type": "...",
+      "type": "concept",
       "label": "...",
       "importance": 0.8,
       "sourceRefs": [
@@ -107,9 +170,46 @@ Example structure:
       ]
     }
   ],
-  "relations": [],
-  "sequences": [],
-  "comparisons": []
+  "relations": [
+    {
+      "id": "r1",
+      "sourceNodeId": "n1",
+      "targetNodeId": "n2",
+      "relationType": "compared_to"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "s1",
+      "type": "process",
+      "label": "Process name",
+      "nodeIds": ["n1", "n2", "n3"]
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "c1",
+      "label": "Comparison name",
+      "items": [
+        {
+          "itemId": "n1",
+          "name": "Item A",
+          "criteria": [
+            { "criterion": "Property 1", "value": "Value A1" },
+            { "criterion": "Property 2", "value": "Value A2" }
+          ]
+        },
+        {
+          "itemId": "n2",
+          "name": "Item B",
+          "criteria": [
+            { "criterion": "Property 1", "value": "Value B1" },
+            { "criterion": "Property 2", "value": "Value B2" }
+          ]
+        }
+      ]
+    }
+  ]
 }`;
 }
 
