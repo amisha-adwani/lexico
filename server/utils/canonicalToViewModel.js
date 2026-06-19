@@ -24,7 +24,7 @@ export function transformCanonicalIR(canonicalIR, viewType = VIEW_TYPES.GENERIC)
     throw new Error('canonicalIR must be a valid object');
   }
 
-  const normalizedViewType = (typeof viewType === 'string' ? viewType.toLowerCase() : VIEW_TYPES.GENERIC);
+  const normalizedViewType = (typeof viewType === 'string' ? viewType.toLowerCase() : VIEW_TYPES.GENERIC.toLowerCase());
 
   switch (normalizedViewType) {
     case VIEW_TYPES.MINDMAP:
@@ -42,7 +42,7 @@ export function transformCanonicalIR(canonicalIR, viewType = VIEW_TYPES.GENERIC)
     case VIEW_TYPES.COMPARISON:
       return toComparisonViewModel(canonicalIR);
 
-    case VIEW_TYPES.CONCEPT_TREE:
+    case VIEW_TYPES.CONCEPT_TREE.toLowerCase():
       return toConceptTreeViewModel(canonicalIR);
 
     case VIEW_TYPES.GENERIC:

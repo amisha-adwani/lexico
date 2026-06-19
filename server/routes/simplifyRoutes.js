@@ -5,6 +5,7 @@ import { extractTextFromFile, isAllowedUpload } from "../utils/extractTextFromFi
 import classifyContent  from "../utils/classifyContent.js";
 import generateStructure  from "../utils/generateStructure.js";
 import transformCanonicalIR from "../utils/canonicalToViewModel.js";
+import recommendViewType from "../utils/recommendViewType.js";
 
 const router = express.Router();
 const upload = multer({
@@ -125,7 +126,7 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
 
     const title = req.body.title;
     const fingerprint = req.body.fingerprint;
-    const viewType = req.body.viewType || "generic";
+    const requestedViewType = req.body.viewType;
 
     const result = await generateCanonicalIR({ text: sourceText, documentTitle: title, sourceFingerprint: fingerprint, language });
 
@@ -143,12 +144,29 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       });
     }
 
-    const viewModel = transformCanonicalIR(result.ir, viewType);
-
-    return res.json({ canonical: result.ir, viewModel, errors: result.errors, warnings: result.warnings, repairLog: result.repairLog });
+    return res.json(buildCanonicalResponse(result, requestedViewType));
   } catch (err) {
     next(err);
   }
 });
+
+export function buildCanonicalResponse(result, requestedViewType) {
+  const recommendation = recommendViewType(result.ir);
+  const recommendedView = recommendation.recommendedView;
+  const viewType = requestedViewType || recommendedView;
+  const viewModel = transformCanonicalIR(result.ir, viewType);
+
+  return {
+    canonical: result.ir,
+    recommendedView,
+    confidence: recommendation.confidence,
+    scores: recommendation.scores,
+    reasons: recommendation.reasons,
+    viewModel,
+    errors: result.errors,
+    warnings: result.warnings,
+    repairLog: result.repairLog,
+  };
+}
 
 export default router;
