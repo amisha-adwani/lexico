@@ -4,7 +4,7 @@ import { simplifyText, generateCanonicalIR } from "../services/aiServices.js";
 import { extractTextFromFile, isAllowedUpload } from "../utils/extractTextFromFile.js";
 import classifyContent  from "../utils/classifyContent.js";
 import generateStructure  from "../utils/generateStructure.js";
-import transformCanonicalIR from "../utils/canonicalToViewModel.js";
+import transformCanonicalIR, { transformAllViews, VIEW_TYPES, transformAndValidate } from "../utils/canonicalToViewModel.js";
 import recommendViewType from "../utils/recommendViewType.js";
 
 const router = express.Router();
@@ -144,25 +144,102 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       });
     }
 
-    return res.json(buildCanonicalResponse(result, requestedViewType));
+    // includeAllViews flag may be passed in body or query (boolean or string 'true')
+    const includeAllViews = req.body.includeAllViews === true || req.body.includeAllViews === 'true' || req.query.includeAllViews === 'true';
+
+    return res.json(buildCanonicalResponse(result, requestedViewType, includeAllViews));
   } catch (err) {
     next(err);
   }
 });
 
-export function buildCanonicalResponse(result, requestedViewType) {
+export function buildCanonicalResponse(result, requestedViewType, includeAllViews = false) {
   const recommendation = recommendViewType(result.ir);
   const recommendedView = recommendation.recommendedView;
-  const viewType = requestedViewType || recommendedView;
-  const viewModel = transformCanonicalIR(result.ir, viewType);
+
+  const normalizedRequestedViewType =
+    typeof requestedViewType === 'string'
+      ? requestedViewType.toLowerCase()
+      : recommendedView;
+  const validViewTypes = new Set(
+    Object.values(VIEW_TYPES).map((viewTypeName) => viewTypeName.toLowerCase())
+  );
+  const viewType = validViewTypes.has(normalizedRequestedViewType)
+    ? normalizedRequestedViewType
+    : recommendedView;
+
+  // Only generate all views when explicitly requested
+  const allViews = includeAllViews ? transformAllViews(result.ir) : undefined;
+
+  let viewModel = null;
+  let viewValidation = null;
+
+  if (allViews) {
+    const selected = allViews[viewType];
+    viewValidation = selected ?? null;
+    viewModel = selected?.success ? selected.data : null;
+  } else {
+    // single-view transform with validation (keeps `viewModel` top-level for compatibility)
+    try {
+      const tv = transformAndValidate(result.ir, viewType);
+      viewValidation = tv;
+      viewModel = tv?.success ? tv.data : null;
+    } catch (err) {
+      viewValidation = null;
+      viewModel = null;
+    }
+  }
+
+  const successfulViews = allViews
+    ? Object.entries(allViews)
+        .filter(([, v]) => v.success)
+        .map(([k]) => k)
+    : undefined;
+
+  const failedViews = allViews
+    ? Object.entries(allViews)
+        .filter(([, v]) => !v.success)
+        .map(([k, v]) => ({ view: k, error: v.error }))
+    : undefined;
+
+  const rankedViews = Array.isArray(recommendation.rankedViews) && !allViews
+    ? recommendation.rankedViews
+    : Object.entries(recommendation.scores || {})
+        .map(([viewTypeName, score]) => {
+          const key = viewTypeName.toLowerCase();
+          const resultView = allViews?.[key];
+          const quality = resultView?.qualityScore ?? 0;
+          const success = resultView?.success ?? true;
+          return {
+            viewTypeName: key,
+            score,
+            quality,
+            success,
+            combined: success ? score + quality : score,
+          };
+        })
+        .sort((a, b) => {
+          if (a.success !== b.success) {
+            return a.success ? -1 : 1;
+          }
+          return b.combined - a.combined;
+        })
+        .map(({ viewTypeName }) => viewTypeName);
 
   return {
     canonical: result.ir,
     recommendedView,
     confidence: recommendation.confidence,
+    rankedViews,
     scores: recommendation.scores,
     reasons: recommendation.reasons,
+
     viewModel,
+    viewValidation,
+    allViews,
+    successfulViews,
+    failedViews,
+
     errors: result.errors,
     warnings: result.warnings,
     repairLog: result.repairLog,
