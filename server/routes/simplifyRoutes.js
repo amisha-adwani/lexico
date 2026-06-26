@@ -206,7 +206,7 @@ export function buildCanonicalResponse(result, requestedViewType, includeAllView
     ? recommendation.rankedViews
     : Object.entries(recommendation.scores || {})
         .map(([viewTypeName, score]) => {
-          const key = viewTypeName.toLowerCase();
+          const key = viewTypeName
           const resultView = allViews?.[key];
           const quality = resultView?.qualityScore ?? 0;
           const success = resultView?.success ?? true;

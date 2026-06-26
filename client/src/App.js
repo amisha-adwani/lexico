@@ -1,78 +1,69 @@
-import { useMemo, useState } from 'react';
-import AppLayout from './components/layout/AppLayout';
-import InputPanel from './components/panels/InputPanel';
-import OutputRenderer from './components/output/OutputRenderer';
-import { exportBlocksToPdf } from './utils/pdfExport';
+import { useState } from "react";
+import AppLayout from "./components/layout/AppLayout";
+import InputPanel from "./components/panels/InputPanel";
+import ViewSwitcher from "./components/viewRenderers/viewSwitcher";
 
 function App() {
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
-  const [outputBlocks, setOutputBlocks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const hasInput = Boolean(inputText.trim() || selectedFile);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [apiResponse, setApiResponse] = useState(null);
 
-  const title = useMemo(() => {
-    if (isLoading) {
-      return 'Analyzing your text...';
-    }
-    if (errorMessage) {
-      return errorMessage;
-    }
-    if (!hasInput) {
-      return 'Ready to simplify';
-    }
-    return 'Analysis and summary';
-  }, [hasInput, isLoading, errorMessage]);
 
   const handleSimplify = async () => {
     const trimmedText = inputText.trim();
     if ((!trimmedText && !selectedFile) || isLoading) return;
 
     setIsLoading(true);
-    setErrorMessage('');
+    setErrorMessage("");
+    setApiResponse(null);
 
     try {
-      let response;
+      const payload = selectedFile ? new FormData() : null;
 
-      if (selectedFile) {
-        const payload = new FormData();
-        payload.append('file', selectedFile);
+      if (payload) {
+        payload.append("file", selectedFile);
+
         if (trimmedText) {
-          payload.append('text', trimmedText);
+          payload.append("text", trimmedText);
         }
 
-        response = await fetch(`${process.env.REACT_APP_API_URL}/api/simplify`, {
-          method: 'POST',
-          body: payload,
-        });
-      } else {
-        response = await fetch(`${process.env.REACT_APP_API_URL}/api/simplify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text: trimmedText }),
-        });
+        payload.append("includeAllViews", "true");
       }
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/simplify/canonical`,
+        {
+          method: "POST",
+          ...(payload
+            ? { body: payload }
+            : {
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  text: trimmedText,
+                  includeAllViews: true,
+                }),
+              }),
+        },
+      );
 
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to simplify text.');
+        throw new Error(data?.error || "Failed to simplify text.");
+      }
+      if (!data?.recommendedView) {
+        throw new Error("Invalid canonical response");
       }
 
-      if (!Array.isArray(data?.blocks)) {
-        throw new Error('Server returned an invalid format.');
-      }
-
-      setOutputBlocks(data.blocks);
+      setApiResponse(data);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to simplify text.';
+        error instanceof Error ? error.message : "Failed to simplify text.";
       setErrorMessage(message);
-      setOutputBlocks([]);
+      setApiResponse(null);
     } finally {
       setIsLoading(false);
     }
@@ -91,15 +82,24 @@ function App() {
         />
       }
       outputPanel={
-        <OutputRenderer
-          blocks={outputBlocks}
-          title={title}
-          onExport={exportBlocksToPdf}
-          isExporting={isExporting}
-          isLoading={isLoading}
-          inputText={inputText}
-          selectedFile={selectedFile}
-        />
+        isLoading ? (
+          <div className="text-slate-500">Analyzing document...</div>
+        ) : errorMessage ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-600">
+            {errorMessage}
+          </div>
+        ) : apiResponse ? (
+          <ViewSwitcher
+            recommendedView={apiResponse.recommendedView}
+            rankedViews={apiResponse.rankedViews}
+            allViews={apiResponse.allViews}
+            viewModel={apiResponse.viewModel}
+          />
+        ) : (
+          <div className="text-slate-500">
+            Submit text to generate a visualization.
+          </div>
+        )
       }
     />
   );
