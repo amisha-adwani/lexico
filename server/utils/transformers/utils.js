@@ -1,3 +1,5 @@
+import { cleanText as normalizeText } from '../visualizationSuitability.js';
+
 export function extractSourceCitations(node, sourceMap = {}) {
   if (!node.sourceRefs || !Array.isArray(node.sourceRefs)) {
     return [];
@@ -34,10 +36,10 @@ export function findChildNodeIds(parentId, relations = []) {
 export function createViewNode(node, sourceMap = {}) {
   return {
     id: node.id,
-    label: node.label || 'Untitled',
+    label: normalizeText(node.label || 'Untitled'),
     type: node.type || 'concept',
     importance: node.importance || 0.5,
-    summary: node.summary || undefined,
+    summary: normalizeText(node.summary || undefined),
     time: node.time || undefined,
     sourceRefs: node.sourceRefs || [],
     citations: extractSourceCitations(node, sourceMap),

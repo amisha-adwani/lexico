@@ -6,6 +6,7 @@ import toTableViewModel from './transformers/toTable.js';
 import toComparisonViewModel from './transformers/toComparison.js';
 import toConceptTreeViewModel from './transformers/toConceptTree.js';
 import toGenericViewModel from './transformers/toGeneric.js';
+import { evaluateVisualizationSuitability } from './visualizationSuitability.js';
 
 // VIEW TYPE CONSTANTS
 
@@ -132,6 +133,14 @@ export function isValidViewModel(viewType, model) {
       case VIEW_TYPES.GENERIC:
       default:
         {
+          if ((viewType || '').toLowerCase() === VIEW_TYPES.TABLE) {
+            const columns = Array.isArray(model.columns) ? model.columns.length : 0;
+            const rows = Array.isArray(model.rows) ? model.rows.length : 0;
+            const valid = columns >= 1 && rows >= 1;
+            const quality = valid ? Math.min(rows / 20, 1) : 0;
+            return { valid, qualityScore: quality, error: valid ? null : 'table requires at least 1 column and 1 row' };
+          }
+
           const hasContent = Object.keys(model).length > 0;
           const quality = hasContent ? 1 : 0;
           return { valid: hasContent, qualityScore: quality, error: hasContent ? null : 'empty view model' };
@@ -144,6 +153,16 @@ export function isValidViewModel(viewType, model) {
 
 function safeTransform(canonicalIR, viewType) {
   try {
+    const suitability = evaluateVisualizationSuitability(canonicalIR, viewType);
+
+    if (!suitability.success && (viewType || '').toLowerCase() !== VIEW_TYPES.GENERIC) {
+      return {
+        success: false,
+        qualityScore: suitability.qualityScore || 0,
+        error: suitability.error || `${viewType} is not suitable for this document`,
+      };
+    }
+
     const data = transformCanonicalIR(canonicalIR, viewType);
 
     if (!isViewModelObject(data)) {
@@ -159,12 +178,16 @@ function safeTransform(canonicalIR, viewType) {
     if (!valid) {
       return {
         success: false,
-        qualityScore: qualityScore || 0,
+        qualityScore: qualityScore || suitability.qualityScore || 0,
         error: error || `${viewType} failed quality validation`,
       };
     }
 
-    return { success: true, qualityScore: qualityScore ?? 1, data };
+    return {
+      success: true,
+      qualityScore: Math.max(qualityScore ?? 1, suitability.qualityScore ?? 0),
+      data,
+    };
   } catch (err) {
     return {
       success: false,

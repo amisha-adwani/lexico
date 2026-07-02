@@ -84,9 +84,12 @@ export async function generateCanonicalIR({ text, documentTitle, sourceFingerpri
   const prompt = buildCanonicalPrompt({ chunks, sourceMap });
 
   const raw = await client.generateContent(prompt);
+  console.log("RAW RESPONSE:");
+console.log(raw);
 
   const parseResult = await tryParseAiJson(raw);
-
+console.log("PARSED IR:");
+console.dir(parseResult.parsed, { depth: null });
   if (parseResult.error) {
     return {
       success: false,
@@ -106,7 +109,8 @@ export async function generateCanonicalIR({ text, documentTitle, sourceFingerpri
     documentTitle,
     sourceFingerprint,
   });
-
+console.log("VALIDATED IR:");
+console.dir(validation.ir, { depth: null });
   // If validation determined the IR is repairable, use the repaired version
   const finalIr = validation.ir || aiIr;
 

@@ -1,7 +1,17 @@
 import { sortByImportance, extractSourceCitations } from './utils.js';
+import { cleanDocument, isFlowDocument } from '../visualizationSuitability.js';
 
 export default function toFlowViewModel(canonicalIR) {
-  const { document, nodes = [], sequences = [], sourceMap = {} } = canonicalIR;
+  const { document = {}, nodes = [], sequences = [], sourceMap = {} } = canonicalIR;
+  const clean = cleanDocument(document);
+
+  if (!isFlowDocument(canonicalIR)) {
+    return {
+      title: clean.title || 'Process Flow',
+      summary: clean.summary || '',
+      steps: [],
+    };
+  }
 
   const flowSequences = sequences.filter(s => ['process', 'workflow'].includes(s.type));
 
@@ -10,7 +20,7 @@ export default function toFlowViewModel(canonicalIR) {
     const steps = [];
 
     flowSequences.forEach(seq => {
-      seq.nodeIds.forEach((nodeId, index) => {
+      (seq.nodeIds || []).forEach((nodeId, index) => {
         const node = nodeMap[nodeId];
         if (node) {
           steps.push({
@@ -28,8 +38,8 @@ export default function toFlowViewModel(canonicalIR) {
     });
 
     return {
-      title: document.title || 'Process Flow',
-      summary: document.summary || '',
+      title: clean.title || 'Process Flow',
+      summary: clean.summary || '',
       steps: steps.slice(0, 20),
     };
   }
@@ -47,8 +57,8 @@ export default function toFlowViewModel(canonicalIR) {
   }));
 
   return {
-    title: document.title || 'Process Flow',
-    summary: document.summary || '',
+    title: clean.title || 'Process Flow',
+    summary: clean.summary || '',
     steps,
   };
 }
