@@ -203,16 +203,16 @@ export function scoreDocumentSuitability(canonicalIR = {}) {
   }
 
   if (profile.hierarchicalRelationCount > 0) {
-    scores.mindmap += 0.45;
-    scores.conceptTree += 0.45;
+    scores.mindmap += 0.5;
+    scores.conceptTree += 0.4;
 
     scores.mindmap += Math.min(profile.hierarchicalRelationCount * 0.03, 0.2);
-    scores.conceptTree += Math.min(profile.hierarchicalRelationCount * 0.04, 0.25);
+    scores.conceptTree += Math.min(profile.hierarchicalRelationCount * 0.04, 0.2);
   }
 
   if (profile.branchingHierarchy) {
     scores.mindmap += 0.25;
-    scores.conceptTree += 0.35;
+    scores.conceptTree += 0.2;
   }
 
   if (profile.nodeCount > 0) {

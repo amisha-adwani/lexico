@@ -134,6 +134,7 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       return res.status(400).json({
         error: result?.errorType || 'unknown_error',
         message: result?.message || 'Failed to generate Canonical IR',
+        stageError: result?.stageError || null,
         details: {
           errors: result?.errors || [],
           warnings: result?.warnings || [],

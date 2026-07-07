@@ -26,13 +26,13 @@ export default function toTimelineViewModel(canonicalIR) {
   // FALLBACK A: Use timeline sequences
   const timelineSequences = sequences.filter(s => s.type === 'timeline');
   if (timelineSequences.length > 0) {
-    return buildTimelineFromSequences(timelineSequences, nodeMap, document, sourceMap);
+    return buildTimelineFromSequences(timelineSequences, nodeMap, clean, sourceMap);
   }
 
   // FALLBACK B: Use process/workflow sequences
   const processSequences = sequences.filter(s => s.type === 'process' || s.type === 'workflow');
   if (processSequences.length > 0) {
-    return buildTimelineFromSequences(processSequences, nodeMap, document, sourceMap);
+    return buildTimelineFromSequences(processSequences, nodeMap, clean, sourceMap);
   }
 
   // FALLBACK C: Use nodes with timestamps

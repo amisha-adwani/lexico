@@ -43,13 +43,22 @@ export default function validateSequences(sequences, nodes = [], sourceMap = {})
       continue;
     }
 
-    const validNodeIds = sequence.nodeIds.filter((nid) => {
+    const uniqueNodeIds = [];
+    const seenSequenceNodeIds = new Set();
+    for (const nid of sequence.nodeIds) {
+      if (seenSequenceNodeIds.has(nid)) {
+        warnings.push(`Sequence ${sequence.id}: contains duplicate node reference ${nid}`);
+        continue;
+      }
+      seenSequenceNodeIds.add(nid);
       if (!nodeIds.has(nid)) {
         warnings.push(`Sequence ${sequence.id}: references non-existent node ${nid}`);
-        return false;
+        continue;
       }
-      return true;
-    });
+      uniqueNodeIds.push(nid);
+    }
+
+    const validNodeIds = uniqueNodeIds;
 
     if (validNodeIds.length > 0 && validNodeIds.length !== sequence.nodeIds.length) {
       repairLog.push(`Removed invalid node references from sequence ${sequence.id}`);

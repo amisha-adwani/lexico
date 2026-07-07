@@ -1,6 +1,25 @@
 import { clampImportance } from '../canonicalSchema.js';
 import { validateSourceRefs } from './validateSourceRefs.js';
 
+function detectCycle(nodeId, parentById) {
+  const path = [];
+  const indexByNodeId = new Map();
+  let currentId = nodeId;
+
+  while (currentId && parentById.has(currentId)) {
+    const existingIndex = indexByNodeId.get(currentId);
+    if (existingIndex !== undefined) {
+      return path[path.length - 1] || currentId;
+    }
+
+    indexByNodeId.set(currentId, path.length);
+    path.push(currentId);
+    currentId = parentById.get(currentId);
+  }
+
+  return null;
+}
+
 export default function validateNodes(nodes, sourceMap = {}) {
   const errors = [];
   const warnings = [];
@@ -13,6 +32,19 @@ export default function validateNodes(nodes, sourceMap = {}) {
 
   const repaired = [];
   const seenIds = new Set();
+  const seenLabels = new Map();
+  const nodeIds = new Set(
+    nodes.filter((node) => node && typeof node === 'object' && typeof node.id === 'string').map((node) => node.id)
+  );
+  const parentById = new Map();
+
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object') continue;
+    if (!node.id || typeof node.id !== 'string') continue;
+    if (typeof node.parentId === 'string' && node.parentId.trim()) {
+      parentById.set(node.id, node.parentId.trim());
+    }
+  }
 
   for (const node of nodes) {
     if (!node || typeof node !== 'object') {
@@ -40,6 +72,14 @@ export default function validateNodes(nodes, sourceMap = {}) {
       continue;
     }
 
+    const normalizedLabel = node.label.trim();
+    const labelKey = normalizedLabel.toLowerCase();
+    if (seenLabels.has(labelKey)) {
+      warnings.push(`Duplicate label detected for node ${node.id}: ${normalizedLabel}`);
+    } else {
+      seenLabels.set(labelKey, node.id);
+    }
+
     const originalImportance = node.importance;
     const importance = clampImportance(originalImportance);
     if (originalImportance !== importance) {
@@ -57,10 +97,27 @@ export default function validateNodes(nodes, sourceMap = {}) {
       continue;
     }
 
+    let parentId = null;
+    if (typeof node.parentId === 'string' && node.parentId.trim()) {
+      parentId = node.parentId.trim();
+      if (!nodeIds.has(parentId)) {
+        warnings.push(`Node ${node.id} references missing parent ${parentId}`);
+        parentId = null;
+        repairLog.push(`Removed invalid parentId from node ${node.id}`);
+      } else {
+        const cycleNodeId = detectCycle(node.id, parentById);
+        if (cycleNodeId === node.id) {
+          warnings.push(`Node ${node.id} participates in a circular parent chain`);
+          parentId = null;
+          repairLog.push(`Removed circular parentId from node ${node.id}`);
+        }
+      }
+    }
+
     const validNode = {
       id: node.id,
       type: node.type,
-      label: node.label.trim(),
+      label: normalizedLabel,
       importance,
       sourceRefs,
     };
@@ -73,8 +130,8 @@ export default function validateNodes(nodes, sourceMap = {}) {
       validNode.time = node.time;
     }
 
-    if (node.parentId && typeof node.parentId === 'string') {
-      validNode.parentId = node.parentId;
+    if (parentId) {
+      validNode.parentId = parentId;
     }
 
     if (node.groupId && typeof node.groupId === 'string') {
