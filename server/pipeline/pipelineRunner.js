@@ -2,6 +2,7 @@ import { logStageEvent } from "../utils/logging.js";
 import createPipelineContext from "../context/PipelineContext.js";
 import chunkStage from "./chunkStage.js";
 import knowledgeExtractionStage from "./knowledgeExtractionStage.js";
+import educationalPlannerStage from "./educationalPlannerStage.js";
 import analysisStage from "./analysisStage.js";
 import blueprintValidationStage from "./blueprintValidationStage.js";
 import canonicalBuilderStage from "./canonicalBuilderStage.js";
@@ -27,6 +28,7 @@ import executionValidationStage from "./executionValidationStage.js";
 const STAGES = [
   chunkStage,
   knowledgeExtractionStage, // Primary AI reasoning (frozen, stable)
+  educationalPlannerStage,
   analysisStage, // Legacy compat (required by blueprintValidationStage, deprecated Phase 2)
   blueprintValidationStage,
   canonicalBuilderStage,

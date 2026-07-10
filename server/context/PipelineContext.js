@@ -68,8 +68,8 @@ export function createPipelineContext(request = {}) {
     // ============================================================================
     // To be populated by Educational Planner in Phase 2.
     // Will define learning hierarchy, ordering, and coverage intent.
-    semanticBlueprint: null,
-
+    semanticBlueprint: null,    educationalBlueprint: null,
+    educationalPlannerRaw: undefined,
     // ============================================================================
     // GRAPH CONSTRUCTION OUTPUTS: Deterministic IR building (canonicalBuilderStage)
     // ============================================================================
