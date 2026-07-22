@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./App.css";
 import AppLayout from "./components/layout/AppLayout";
 import InputPanel from "./components/panels/InputPanel";
 import ViewSwitcher from "./components/viewRenderers/viewSwitcher";
@@ -82,24 +83,14 @@ function App() {
         />
       }
       outputPanel={
-        isLoading ? (
-          <div className="text-slate-500">Analyzing document...</div>
-        ) : errorMessage ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-600">
-            {errorMessage}
-          </div>
-        ) : apiResponse ? (
-          <ViewSwitcher
-            recommendedView={apiResponse.recommendedView}
-            rankedViews={apiResponse.rankedViews}
-            allViews={apiResponse.allViews}
-            viewModel={apiResponse.viewModel}
-          />
-        ) : (
-          <div className="text-slate-500">
-            Submit text to generate a visualization.
-          </div>
-        )
+        <ViewSwitcher
+          recommendedView={apiResponse?.recommendedView}
+          rankedViews={apiResponse?.rankedViews}
+          allViews={apiResponse?.allViews}
+          viewModel={apiResponse?.viewModel}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+        />
       }
     />
   );

@@ -16,4 +16,4 @@ export {
   GenericRenderer,
 }
 
-export { default as default } from './ViewRenderer'
+export { default } from './ViewRenderer'
