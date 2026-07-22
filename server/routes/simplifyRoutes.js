@@ -4,7 +4,8 @@ import { simplifyText, generateCanonicalIR } from "../services/aiServices.js";
 import { extractTextFromFile, isAllowedUpload } from "../utils/extractTextFromFile.js";
 import classifyContent  from "../utils/classifyContent.js";
 import generateStructure  from "../utils/generateStructure.js";
-import transformCanonicalIR from "../utils/canonicalToViewModel.js";
+import transformCanonicalIR, { transformAllViews, VIEW_TYPES, transformAndValidate } from "../utils/canonicalToViewModel.js";
+import recommendViewType from "../utils/recommendViewType.js";
 
 const router = express.Router();
 const upload = multer({
@@ -125,7 +126,7 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
 
     const title = req.body.title;
     const fingerprint = req.body.fingerprint;
-    const viewType = req.body.viewType || "generic";
+    const requestedViewType = req.body.viewType;
 
     const result = await generateCanonicalIR({ text: sourceText, documentTitle: title, sourceFingerprint: fingerprint, language });
 
@@ -133,6 +134,7 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       return res.status(400).json({
         error: result?.errorType || 'unknown_error',
         message: result?.message || 'Failed to generate Canonical IR',
+        stageError: result?.stageError || null,
         details: {
           errors: result?.errors || [],
           warnings: result?.warnings || [],
@@ -143,12 +145,140 @@ router.post("/canonical", handleUpload, async (req, res, next) => {
       });
     }
 
-    const viewModel = transformCanonicalIR(result.ir, viewType);
+    // includeAllViews flag may be passed in body or query (boolean or string 'true')
+    const includeAllViews = req.body.includeAllViews === true || req.body.includeAllViews === 'true' || req.query.includeAllViews === 'true';
 
-    return res.json({ canonical: result.ir, viewModel, errors: result.errors, warnings: result.warnings, repairLog: result.repairLog });
+    return res.json(buildCanonicalResponse(result, requestedViewType, includeAllViews));
   } catch (err) {
     next(err);
   }
 });
+
+export function buildCanonicalResponse(result, requestedViewType, includeAllViews = false) {
+  const recommendation = recommendViewType(result.ir);
+  const recommendedView = recommendation.recommendedView;
+
+  const normalizedRequestedViewType =
+    typeof requestedViewType === 'string'
+      ? requestedViewType.toLowerCase()
+      : recommendedView;
+  const validViewTypes = new Set(
+    Object.values(VIEW_TYPES).map((viewTypeName) => viewTypeName.toLowerCase())
+  );
+  const viewType = validViewTypes.has(normalizedRequestedViewType)
+    ? normalizedRequestedViewType
+    : recommendedView;
+
+  // Only generate all views when explicitly requested
+  const allViews = includeAllViews ? transformAllViews(result.ir) : undefined;
+
+  let viewModel = null;
+  let viewValidation = null;
+
+  const buildFallbackViewModel = (fallbackViewType) => {
+    try {
+      return transformCanonicalIR(result.ir, fallbackViewType);
+    } catch (err) {
+      return {
+        title: result.ir?.document?.title || 'Untitled',
+        summary: result.ir?.document?.summary || '',
+        nodes: [],
+        steps: [],
+        points: [],
+        items: [],
+        rows: [],
+        columns: [],
+      };
+    }
+  };
+
+  if (allViews) {
+    const selected = allViews[viewType];
+    viewValidation = selected ?? null;
+    viewModel = selected?.success && selected.data
+      ? selected.data
+      : buildFallbackViewModel(viewType);
+  } else {
+    // single-view transform with validation (keeps `viewModel` top-level for compatibility)
+    try {
+      const tv = transformAndValidate(result.ir, viewType);
+      viewValidation = tv;
+      viewModel = tv?.success && tv.data
+        ? tv.data
+        : buildFallbackViewModel(viewType);
+    } catch (err) {
+      viewValidation = null;
+      viewModel = buildFallbackViewModel(viewType);
+    }
+  }
+
+  const successfulViews = allViews
+    ? Object.entries(allViews)
+        .filter(([, v]) => v.success)
+        .map(([k]) => k)
+    : undefined;
+
+  const failedViews = allViews
+    ? Object.entries(allViews)
+        .filter(([, v]) => !v.success)
+        .map(([k, v]) => ({ view: k, error: v.error }))
+    : undefined;
+
+  const scoredViews = Array.isArray(recommendation.rankedViews) && recommendation.rankedViews.length > 0
+    ? recommendation.rankedViews.map((entry) => ({
+        viewTypeName: entry?.view || entry?.viewTypeName || entry?.name,
+        score: Number(entry?.score ?? 0),
+      }))
+    : Object.entries(recommendation.scores || {}).map(([viewTypeName, score]) => ({
+        viewTypeName,
+        score: Number(score ?? 0),
+      }));
+
+  const rankedViews = !allViews
+    ? scoredViews.map(({ viewTypeName }) => viewTypeName)
+    : scoredViews
+        .map(({ viewTypeName, score }) => {
+          const resultView = allViews?.[viewTypeName];
+          const quality = resultView?.qualityScore ?? 0;
+          const success = resultView?.success ?? true;
+          return {
+            viewTypeName,
+            score,
+            quality,
+            success,
+            combined: success ? score + quality : score,
+          };
+        })
+        .sort((a, b) => {
+          if (a.success !== b.success) {
+            return a.success ? -1 : 1;
+          }
+          return b.combined - a.combined;
+        })
+        .map(({ viewTypeName }) => viewTypeName);
+
+  const scores = Object.fromEntries(
+    scoredViews.map(({ viewTypeName, score }) => [viewTypeName, Number(score ?? 0)])
+  );
+
+  return {
+    canonical: result.ir,
+    recommendedView,
+    confidence: recommendation.confidence,
+    rankedViews,
+    scores,
+    reasons: recommendation.reasons,
+
+    viewModel,
+    viewValidation,
+    allViews,
+    successfulViews,
+    failedViews,
+
+    errors: result.errors,
+    warnings: result.warnings,
+    repairLog: result.repairLog,
+  };
+}
 
 export default router;

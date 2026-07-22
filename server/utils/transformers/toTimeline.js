@@ -1,12 +1,22 @@
 import { extractSourceCitations, sortByImportance } from './utils.js';
+import { cleanDocument, isTimelineDocument } from '../visualizationSuitability.js';
 
 export default function toTimelineViewModel(canonicalIR) {
-  const { document, nodes = [], sequences = [], sourceMap = {} } = canonicalIR;
+  const { document = {}, nodes = [], sequences = [], sourceMap = {} } = canonicalIR;
+  const clean = cleanDocument(document);
 
   if (!nodes || nodes.length === 0) {
     return {
-      title: document.title || 'Timeline',
-      summary: document.summary || '',
+      title: clean.title || 'Timeline',
+      summary: clean.summary || '',
+      points: [],
+    };
+  }
+
+  if (!isTimelineDocument(canonicalIR)) {
+    return {
+      title: clean.title || 'Timeline',
+      summary: clean.summary || '',
       points: [],
     };
   }
@@ -16,13 +26,13 @@ export default function toTimelineViewModel(canonicalIR) {
   // FALLBACK A: Use timeline sequences
   const timelineSequences = sequences.filter(s => s.type === 'timeline');
   if (timelineSequences.length > 0) {
-    return buildTimelineFromSequences(timelineSequences, nodeMap, document, sourceMap);
+    return buildTimelineFromSequences(timelineSequences, nodeMap, clean, sourceMap);
   }
 
   // FALLBACK B: Use process/workflow sequences
   const processSequences = sequences.filter(s => s.type === 'process' || s.type === 'workflow');
   if (processSequences.length > 0) {
-    return buildTimelineFromSequences(processSequences, nodeMap, document, sourceMap);
+    return buildTimelineFromSequences(processSequences, nodeMap, clean, sourceMap);
   }
 
   // FALLBACK C: Use nodes with timestamps
@@ -43,8 +53,8 @@ export default function toTimelineViewModel(canonicalIR) {
     }));
 
     return {
-      title: document.title || 'Timeline',
-      summary: document.summary || '',
+      title: clean.title || 'Timeline',
+      summary: clean.summary || '',
       points,
     };
   }
@@ -63,8 +73,8 @@ export default function toTimelineViewModel(canonicalIR) {
   }));
 
   return {
-    title: document.title || 'Timeline',
-    summary: document.summary || '',
+    title: clean.title || 'Timeline',
+    summary: clean.summary || '',
     points,
   };
 }
@@ -76,9 +86,9 @@ function buildTimelineFromSequences(sequences, nodeMap, document, sourceMap) {
   const points = [];
 
   sequences.forEach(seq => {
-    seq.nodeIds.forEach((nodeId, index) => {
+    (seq.nodeIds || []).forEach((nodeId, index) => {
       const node = nodeMap[nodeId];
-      if (node) {
+      if (node) { 
         points.push({
           nodeId: node.id,
           label: node.label || `Step ${index + 1}`,

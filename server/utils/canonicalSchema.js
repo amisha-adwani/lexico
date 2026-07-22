@@ -23,6 +23,7 @@ export const NODE_TYPES = {
 
 export const RELATION_TYPES = {
   DEPENDS_ON: 'depends_on',
+  REQUIRES: 'requires',
   SUPPORTS: 'supports',
   PRECEDES: 'precedes',
   FOLLOWS: 'follows',

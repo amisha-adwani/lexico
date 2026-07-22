@@ -1,11 +1,21 @@
 import { sortByImportance, buildHierarchyTree } from './utils.js';
+import { cleanDocument, isMindMapDocument } from '../visualizationSuitability.js';
 
 export default function toMindmapViewModel(canonicalIR) {
-  const { document, nodes = [], relations = [], sourceMap = {} } = canonicalIR;
+  const { document = {}, nodes = [], relations = [], sourceMap = {} } = canonicalIR;
+  const clean = cleanDocument(document);
 
   if (!nodes.length) {
     return {
-      title: document.title || 'Untitled',
+      title: clean.title || 'Untitled',
+      nodes: [],
+    };
+  }
+
+  if (!isMindMapDocument(canonicalIR)) {
+    return {
+      title: clean.title || 'Untitled',
+      summary: clean.summary || '',
       nodes: [],
     };
   }
@@ -13,17 +23,7 @@ export default function toMindmapViewModel(canonicalIR) {
   const rootNode = sortByImportance(nodes)[0];
   const hierarchyTree = buildHierarchyTree(rootNode, nodes, relations, sourceMap);
 
-  const convertToMindmapFormat = (node, depth = 0) => {
-    if (depth > 3) {
-      return {
-        label: node.label,
-        nodeId: node.id,
-        sourceRefs: node.sourceRefs || [],
-        citations: node.citations || [],
-        children: [],
-      };
-    }
-
+  const convertToMindmapFormat = (node) => {
     return {
       label: node.label,
       nodeId: node.id,
@@ -38,8 +38,8 @@ export default function toMindmapViewModel(canonicalIR) {
   };
 
   return {
-    title: document.title || 'Untitled',
-    summary: document.summary || '',
+    title: clean.title || 'Untitled',
+    summary: clean.summary || '',
     nodes: [convertToMindmapFormat(hierarchyTree)],
   };
 }

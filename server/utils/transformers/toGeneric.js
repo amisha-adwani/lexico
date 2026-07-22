@@ -1,4 +1,5 @@
 import { createViewNode } from './utils.js';
+import { cleanDocument } from '../visualizationSuitability.js';
 
 export default function toGenericViewModel(canonicalIR) {
   const {
@@ -9,13 +10,14 @@ export default function toGenericViewModel(canonicalIR) {
     comparisons = [],
     sourceMap = {},
   } = canonicalIR;
+  const clean = cleanDocument(document);
 
   return {
-    title: document.title || 'Untitled Document',
+    title: clean.title || 'Untitled Document',
     document: {
       schemaVersion: document.schemaVersion,
-      title: document.title,
-      summary: document.summary,
+      title: clean.title,
+      summary: clean.summary,
       language: document.language,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
