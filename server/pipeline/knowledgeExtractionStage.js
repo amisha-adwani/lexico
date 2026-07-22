@@ -55,6 +55,7 @@ export default async function knowledgeExtractionStage(context) {
   try {
     const aiStart = nowMs();
     extractionRaw = await aiClient.generateContent(extractionPrompt);
+    console.log('extract rsw from knowledge extractor',JSON.stringify(extractionRaw, null, 2));
     metrics.push({
       stage: "knowledge_extractor",
       durationMs: nowMs() - aiStart,

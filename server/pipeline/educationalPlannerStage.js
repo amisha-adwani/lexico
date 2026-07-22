@@ -32,6 +32,8 @@ import {
 export default async function educationalPlannerStage(context) {
   const stageStart = nowMs();
   const metrics = [];
+  console.log(
+  JSON.stringify('knowledge model',context.knowledgeModel, null, 2));
 
   if (!context?.knowledgeModel || typeof context.knowledgeModel !== "object") {
     const pipelineResult = buildFailureResult({

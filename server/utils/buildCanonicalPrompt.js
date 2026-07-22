@@ -16,9 +16,9 @@ function listValues(values) {
 function buildHeader() {
   return `You are an expert Canonical IR builder.
 
-You have already been given the document analysis produced by a previous AI.
-Assume that analysis is correct.
-Your only responsibility is to construct Canonical IR from the semantic blueprint and chunk evidence.
+You have already been given the educational blueprint produced by a previous AI stage.
+Assume that blueprint is correct.
+Your only responsibility is to construct Canonical IR from the educational blueprint and chunk evidence.
 
 Return ONLY valid JSON.`;
 }
@@ -27,12 +27,12 @@ function buildBuilderInstructions() {
   return `
 CANONICAL IR BUILDING TASK
 You are not re-analyzing the document.
-The semantic blueprint is the primary source of truth for what graph to build.
+The educational blueprint is the primary source of truth for what graph to build.
 Use chunk text only for evidence, node summaries, sourceRefs, and missing details.
-Infer structure only when the semantic blueprint is missing a specific field.
+Infer structure only when the educational blueprint is missing a specific field.
 If chunk evidence and blueprint intent appear to conflict, preserve blueprint structure and use chunks for factual wording.
 
-SEMANTIC BLUEPRINT EXECUTION ORDER
+EDUCATIONAL BLUEPRINT EXECUTION ORDER
 Follow this order exactly and do not skip ahead:
 1) Hierarchy first: topologyPlan.plannedHierarchy
 - Traverse plannedHierarchy recursively.
@@ -125,9 +125,9 @@ COMPARISON SECTION:
 `;
 }
 
-function buildDocumentAnalysisSection({ documentAnalysis }) {
-  return `DOCUMENT ANALYSIS
-${formatJson(documentAnalysis)}`;
+function buildEducationalBlueprintSection({ educationalBlueprint }) {
+  return `EDUCATIONAL BLUEPRINT
+${formatJson(educationalBlueprint)}`;
 }
 
 function buildSourceChunkDefinitions({ chunks, sourceMap }) {
@@ -152,20 +152,22 @@ function buildJsonContract() {
 `;
 }
 
-export default function buildCanonicalPrompt({ chunks, sourceMap, documentAnalysis }) {
+export default function buildCanonicalPrompt({ chunks, sourceMap, educationalBlueprint, documentAnalysis }) {
+  const blueprint = educationalBlueprint ?? documentAnalysis;
+
   if (!Array.isArray(chunks) || typeof sourceMap !== "object" || sourceMap === null) {
     throw new Error("buildCanonicalPrompt requires { chunks, sourceMap } from chunkText()");
   }
 
-  if (!documentAnalysis || typeof documentAnalysis !== "object") {
-    throw new Error("buildCanonicalPrompt requires documentAnalysis from buildDocumentAnalysisPrompt()");
+  if (!blueprint || typeof blueprint !== "object") {
+    throw new Error("buildCanonicalPrompt requires educationalBlueprint");
   }
 
   return [
     buildHeader(),
     buildBuilderInstructions(),
     buildSchemaRules(),
-    buildDocumentAnalysisSection({ documentAnalysis }),
+    buildEducationalBlueprintSection({ educationalBlueprint: blueprint }),
     buildSourceChunkDefinitions({ chunks, sourceMap }),
     buildJsonContract(),
   ].join("\n\n");

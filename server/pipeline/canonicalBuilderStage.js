@@ -13,15 +13,17 @@ export default async function canonicalBuilderStage(context) {
   const metrics = [];
 
   const promptStart = nowMs();
+  const educationalBlueprint = context.educationalBlueprint;
+
   const canonicalPrompt = buildCanonicalPrompt({
     chunks: context.chunks,
     sourceMap: context.sourceMap,
-    documentAnalysis: context.semanticBlueprint,
+    educationalBlueprint,
   });
   metrics.push({
     stage: "canonical_builder_prompt",
     durationMs: nowMs() - promptStart,
-    inputSize: context.semanticBlueprint,
+    inputSize: educationalBlueprint,
     outputSize: canonicalPrompt,
     warnings: [],
     validationResult: "ok",
@@ -34,7 +36,7 @@ export default async function canonicalBuilderStage(context) {
     metrics.push({
       stage: "canonical_builder",
       durationMs: nowMs() - buildStart,
-      inputSize: context.semanticBlueprint,
+      inputSize: educationalBlueprint,
       outputSize: canonicalRaw,
       warnings: [],
       validationResult: "ok",
@@ -87,6 +89,7 @@ export default async function canonicalBuilderStage(context) {
     {
       canonicalRaw,
       canonicalParsed: parseResult.parsed,
+      canonicalIR: parseResult.parsed,
     },
     nowMs() - stageStart,
     [],

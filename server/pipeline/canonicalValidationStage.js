@@ -3,7 +3,7 @@ import { nowMs, successStageResult } from "./stageUtils.js";
 
 export default async function canonicalValidationStage(context) {
   const startedAt = nowMs();
-  const aiIr = context.canonicalParsed;
+  const aiIr = context.canonicalIR || context.canonicalParsed || {};
   aiIr.sourceMap = context.sourceMap;
 
   const validation = validateCanonicalIR(aiIr, {

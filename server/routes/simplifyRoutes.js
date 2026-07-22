@@ -175,19 +175,40 @@ export function buildCanonicalResponse(result, requestedViewType, includeAllView
   let viewModel = null;
   let viewValidation = null;
 
+  const buildFallbackViewModel = (fallbackViewType) => {
+    try {
+      return transformCanonicalIR(result.ir, fallbackViewType);
+    } catch (err) {
+      return {
+        title: result.ir?.document?.title || 'Untitled',
+        summary: result.ir?.document?.summary || '',
+        nodes: [],
+        steps: [],
+        points: [],
+        items: [],
+        rows: [],
+        columns: [],
+      };
+    }
+  };
+
   if (allViews) {
     const selected = allViews[viewType];
     viewValidation = selected ?? null;
-    viewModel = selected?.success ? selected.data : null;
+    viewModel = selected?.success && selected.data
+      ? selected.data
+      : buildFallbackViewModel(viewType);
   } else {
     // single-view transform with validation (keeps `viewModel` top-level for compatibility)
     try {
       const tv = transformAndValidate(result.ir, viewType);
       viewValidation = tv;
-      viewModel = tv?.success ? tv.data : null;
+      viewModel = tv?.success && tv.data
+        ? tv.data
+        : buildFallbackViewModel(viewType);
     } catch (err) {
       viewValidation = null;
-      viewModel = null;
+      viewModel = buildFallbackViewModel(viewType);
     }
   }
 
@@ -203,16 +224,25 @@ export function buildCanonicalResponse(result, requestedViewType, includeAllView
         .map(([k, v]) => ({ view: k, error: v.error }))
     : undefined;
 
-  const rankedViews = Array.isArray(recommendation.rankedViews) && !allViews
-    ? recommendation.rankedViews
-    : Object.entries(recommendation.scores || {})
-        .map(([viewTypeName, score]) => {
-          const key = viewTypeName
-          const resultView = allViews?.[key];
+  const scoredViews = Array.isArray(recommendation.rankedViews) && recommendation.rankedViews.length > 0
+    ? recommendation.rankedViews.map((entry) => ({
+        viewTypeName: entry?.view || entry?.viewTypeName || entry?.name,
+        score: Number(entry?.score ?? 0),
+      }))
+    : Object.entries(recommendation.scores || {}).map(([viewTypeName, score]) => ({
+        viewTypeName,
+        score: Number(score ?? 0),
+      }));
+
+  const rankedViews = !allViews
+    ? scoredViews.map(({ viewTypeName }) => viewTypeName)
+    : scoredViews
+        .map(({ viewTypeName, score }) => {
+          const resultView = allViews?.[viewTypeName];
           const quality = resultView?.qualityScore ?? 0;
           const success = resultView?.success ?? true;
           return {
-            viewTypeName: key,
+            viewTypeName,
             score,
             quality,
             success,
@@ -227,12 +257,16 @@ export function buildCanonicalResponse(result, requestedViewType, includeAllView
         })
         .map(({ viewTypeName }) => viewTypeName);
 
+  const scores = Object.fromEntries(
+    scoredViews.map(({ viewTypeName, score }) => [viewTypeName, Number(score ?? 0)])
+  );
+
   return {
     canonical: result.ir,
     recommendedView,
     confidence: recommendation.confidence,
     rankedViews,
-    scores: recommendation.scores,
+    scores,
     reasons: recommendation.reasons,
 
     viewModel,

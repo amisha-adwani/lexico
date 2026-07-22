@@ -8,14 +8,15 @@ import {
 
 export default async function executionValidationStage(context) {
   const startedAt = nowMs();
-  const executionValidation = validateBlueprintExecution(context.semanticBlueprint, context.canonicalIR);
+  const blueprint = context.educationalBlueprint || context.semanticBlueprint;
+  const executionValidation = validateBlueprintExecution(blueprint, context.canonicalIR);
   const durationMs = nowMs() - startedAt;
 
   const metrics = [
     {
       stage: "blueprint_execution_validation",
       durationMs,
-      inputSize: context.semanticBlueprint,
+      inputSize: blueprint,
       outputSize: executionValidation.diagnostics || executionValidation.details,
       warnings: executionValidation.warnings,
       validationResult: executionValidation.warnings.length > 0 ? "warnings" : "ok",
