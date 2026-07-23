@@ -20,7 +20,14 @@ You have already been given the educational blueprint produced by a previous AI 
 Assume that blueprint is correct.
 Your only responsibility is to construct Canonical IR from the educational blueprint and chunk evidence.
 
-Return ONLY valid JSON.`;
+CRITICAL OUTPUT RULES:
+- Return STRICT JSON ONLY.
+- No markdown.
+- No explanations.
+- No comments.
+- No code fences.
+- No surrounding text.
+- Return exactly one JSON object and nothing else.`;
 }
 
 function buildBuilderInstructions() {
@@ -130,6 +137,21 @@ function buildEducationalBlueprintSection({ educationalBlueprint }) {
 ${formatJson(educationalBlueprint)}`;
 }
 
+function buildOutputChecklist() {
+  return `OUTPUT VERIFICATION CHECKLIST:
+Before finalizing the JSON, internally verify all of the following:
+- The output is valid JSON syntax.
+- All braces are balanced.
+- All brackets are balanced.
+- All strings are properly escaped.
+- Only double quotes are used for JSON strings.
+- No trailing commas exist.
+- No missing commas exist.
+- No partial objects or arrays are left unfinished.
+- No placeholder text such as "TODO" or "TBD" is present.
+- The response contains no markdown, code fences, comments, or prose.`;
+}
+
 function buildSourceChunkDefinitions({ chunks, sourceMap }) {
   return `SOURCE CHUNK DEFINITIONS:
 - Use the chunkId values from the chunks below for node sourceRefs.
@@ -149,6 +171,21 @@ function buildJsonContract() {
 - Do not wrap the JSON in quotes or any other container.
 - If a field is not applicable, use an empty array or object, not null.
 - Ensure every top-level section is present, even if empty.
+- The response must be exactly one top-level object with these fields: document, nodes, relations, sequences, comparisons.
+- document must be an object with required fields: schemaVersion, title, summary, language, sourceFingerprint.
+- nodes must be an array of objects.
+- Each node must include id (string), type (string), label (string), importance (number), sourceRefs (array).
+- sourceRefs must be an array of objects with a sourceId string.
+- relations must be an array of objects.
+- Each relation must include id (string), sourceNodeId (string), targetNodeId (string).
+- relationType may be omitted or must be a string when present.
+- sequences must be an array of objects.
+- Each sequence must include id (string), type (string), label (string), nodeIds (array of strings).
+- comparisons must be an array of objects.
+- Every comparison must be represented in the relations array with relationType "compared_to".
+- Fields that may be empty: document.summary, nodes, relations, sequences, comparisons, sourceRefs, nodeIds.
+- Fields that must never be omitted: document, nodes, relations, sequences, comparisons.
+- Do not omit required fields even when empty arrays are used.
 `;
 }
 
@@ -170,5 +207,6 @@ export default function buildCanonicalPrompt({ chunks, sourceMap, educationalBlu
     buildEducationalBlueprintSection({ educationalBlueprint: blueprint }),
     buildSourceChunkDefinitions({ chunks, sourceMap }),
     buildJsonContract(),
+    buildOutputChecklist(),
   ].join("\n\n");
 }
