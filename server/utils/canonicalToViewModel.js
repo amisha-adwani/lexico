@@ -107,17 +107,36 @@ export function isValidViewModel(viewType, model) {
         {
           const nodes = Array.isArray(model.nodes) ? (function count(nodesArr) {
             let c = 0;
-            function walk(n) {
+            let maxDepth = 0;
+            let branchingFactor = 0;
+            let connectedNodes = 0;
+
+            function walk(n, depth = 0) {
               if (!n) return;
               c += 1;
-              (n.children || []).forEach(child => walk(child));
+              maxDepth = Math.max(maxDepth, depth + 1);
+              const childCount = Array.isArray(n.children) ? n.children.length : 0;
+              branchingFactor = Math.max(branchingFactor, childCount);
+              if (childCount > 0 || depth > 0) {
+                connectedNodes += 1;
+              }
+              (n.children || []).forEach(child => walk(child, depth + 1));
             }
-            nodesArr.forEach(n => walk(n));
-            return c;
-          })(model.nodes) : 0;
-          const valid = nodes >= 2;
-          const quality = valid ? Math.min(nodes / 10, 1) : 0;
-          return { valid, qualityScore: quality, error: valid ? null : 'mindmap requires at least 2 nodes' };
+
+            nodesArr.forEach(n => walk(n, 0));
+            return { count: c, maxDepth, branchingFactor, connectedNodes };
+          })(model.nodes) : { count: 0, maxDepth: 0, branchingFactor: 0, connectedNodes: 0 };
+
+          const hasMeaningfulStructure = nodes.maxDepth >= 2 || nodes.branchingFactor >= 2 || (nodes.count >= 2 && nodes.connectedNodes >= 2);
+          const valid = nodes.count >= 2 && (hasMeaningfulStructure || nodes.count >= 3);
+          const depthScore = Math.min(nodes.maxDepth / 4, 1);
+          const branchingScore = Math.min(nodes.branchingFactor / 3, 1);
+          const connectivityScore = nodes.count > 0 ? Math.min(nodes.connectedNodes / Math.max(nodes.count, 1), 1) : 0;
+          const quality = valid
+            ? Number((0.35 + (nodes.count / 20) * 0.35 + depthScore * 0.2 + branchingScore * 0.1 + connectivityScore * 0.1).toFixed(2))
+            : 0;
+
+          return { valid, qualityScore: quality, error: valid ? null : 'mindmap requires at least 2 nodes with meaningful hierarchy' };
         }
 
       case VIEW_TYPES.CONCEPT_TREE.toLowerCase():
