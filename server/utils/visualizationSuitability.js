@@ -1,6 +1,19 @@
 const PROCEDURAL_SEQUENCE_TYPES = new Set(['process', 'workflow']);
 const CHRONOLOGICAL_SEQUENCE_TYPES = new Set(['timeline']);
-const HIERARCHICAL_RELATION_TYPES = new Set(['contains', 'supports']);
+const HIERARCHICAL_RELATION_TYPES = new Set([
+  'contains',
+  'supports',
+  'part_of',
+  'subtopic_of',
+  'parent_of',
+  'child_of',
+  'includes',
+  'belongs_to',
+  'has_part',
+  'composes',
+  'is_a',
+  'instance_of',
+]);
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -58,16 +71,71 @@ function getComparisonItemCount(canonicalIR = {}) {
   }, 0);
 }
 
-function hasBranchingHierarchy(nodes, relations) {
-  const childCounts = new Map();
+function getHierarchyProfile(nodes = [], relations = []) {
+  const adjacency = new Map();
+  const childrenByParent = new Map();
+  const nodesInHierarchy = new Set();
+  const edgeCount = relations.reduce((total, relation) => {
+    if (!HIERARCHICAL_RELATION_TYPES.has(relation.relationType) || !relation.sourceNodeId || !relation.targetNodeId) {
+      return total;
+    }
 
-  relations.forEach(relation => {
-    if (HIERARCHICAL_RELATION_TYPES.has(relation.relationType) && relation.sourceNodeId) {
-      childCounts.set(relation.sourceNodeId, (childCounts.get(relation.sourceNodeId) || 0) + 1);
+    nodesInHierarchy.add(relation.sourceNodeId);
+    nodesInHierarchy.add(relation.targetNodeId);
+
+    if (!childrenByParent.has(relation.sourceNodeId)) {
+      childrenByParent.set(relation.sourceNodeId, []);
+    }
+    childrenByParent.get(relation.sourceNodeId).push(relation.targetNodeId);
+
+    return total + 1;
+  }, 0);
+
+  nodes.forEach(node => {
+    if (node.parentId) {
+      nodesInHierarchy.add(node.id);
+      nodesInHierarchy.add(node.parentId);
+
+      if (!childrenByParent.has(node.parentId)) {
+        childrenByParent.set(node.parentId, []);
+      }
+      childrenByParent.get(node.parentId).push(node.id);
     }
   });
 
-  return nodes.some(node => (childCounts.get(node.id) || 0) >= 2) || nodes.some(node => node.parentId);
+  const childCounts = Array.from(childrenByParent.values()).map(children => children.length);
+  const branchingFactor = childCounts.length > 0 ? Math.max(...childCounts) : 0;
+  const connectedNodeCount = nodesInHierarchy.size;
+
+  const depthByNode = new Map();
+  const visit = (nodeId, depth, visited = new Set()) => {
+    if (!nodeId || visited.has(nodeId)) {
+      return;
+    }
+
+    visited.add(nodeId);
+    const currentDepth = depthByNode.get(nodeId) || 0;
+    if (depth > currentDepth) {
+      depthByNode.set(nodeId, depth);
+    }
+
+    const children = childrenByParent.get(nodeId) || [];
+    children.forEach(childId => visit(childId, depth + 1, visited));
+  };
+
+  nodes.forEach(node => visit(node.id, 1, new Set()));
+
+  const maxHierarchyDepth = depthByNode.size > 0 ? Math.max(...depthByNode.values()) : 0;
+  const branchingHierarchy = branchingFactor >= 2 || maxHierarchyDepth >= 2 || nodes.some(node => node.parentId);
+
+  return {
+    adjacency,
+    edgeCount,
+    branchingFactor,
+    connectedNodeCount,
+    maxHierarchyDepth,
+    branchingHierarchy,
+  };
 }
 
 export function analyzeCanonicalIR(canonicalIR = {}) {
@@ -79,12 +147,13 @@ export function analyzeCanonicalIR(canonicalIR = {}) {
 
   const timelineSequenceCount = sequences.filter(sequence => CHRONOLOGICAL_SEQUENCE_TYPES.has(sequence.type)).length;
   const processSequenceCount = sequences.filter(sequence => PROCEDURAL_SEQUENCE_TYPES.has(sequence.type)).length;
-  const hierarchicalRelationCount = countRelations(relations, ['contains', 'supports']);
+  const hierarchicalRelationCount = countRelations(relations, Array.from(HIERARCHICAL_RELATION_TYPES));
   const workflowRelationCount = countRelations(relations, ['depends_on', 'precedes', 'follows']);
   const comparisonRelationCount = countRelations(relations, ['compared_to']);
   const nodesWithTime = nodes.filter(node => isValidTimestamp(node.time)).length;
   const comparisonItemCount = getComparisonItemCount(canonicalIR);
-  const branchingHierarchy = hasBranchingHierarchy(nodes, relations);
+  const hierarchyProfile = getHierarchyProfile(nodes, relations);
+  const branchingHierarchy = hierarchyProfile.branchingHierarchy;
   const orderedSequenceLength = Math.max(
     0,
     ...sequences.map(sequence => (Array.isArray(sequence.nodeIds) ? sequence.nodeIds.length : 0))
@@ -93,7 +162,13 @@ export function analyzeCanonicalIR(canonicalIR = {}) {
   const isProceduralDocument = processSequenceCount > 0 || workflowRelationCount > 0;
   const isChronologicalDocument = timelineSequenceCount > 0 || nodesWithTime >= 2;
   const isComparisonDocument = comparisonItemCount >= 2 || comparisonRelationCount > 0;
-  const isHierarchicalDocument = hierarchicalRelationCount > 0 || branchingHierarchy;
+  const hasMeaningfulHierarchy =
+    hierarchyProfile.edgeCount > 0 ||
+    hierarchyProfile.branchingFactor >= 2 ||
+    hierarchyProfile.maxHierarchyDepth >= 2 ||
+    nodes.some(node => node.parentId) ||
+    (nodes.length >= 2 && hierarchyProfile.connectedNodeCount >= 2);
+  const isHierarchicalDocument = hasMeaningfulHierarchy || hierarchicalRelationCount > 0 || branchingHierarchy;
   const isConceptualDocument = nodes.length > 0 && !isProceduralDocument && !isChronologicalDocument && !isComparisonDocument;
 
   return {
@@ -111,6 +186,10 @@ export function analyzeCanonicalIR(canonicalIR = {}) {
     nodesWithTime,
     comparisonItemCount,
     branchingHierarchy,
+    hierarchyEdgeCount: hierarchyProfile.edgeCount,
+    branchingFactor: hierarchyProfile.branchingFactor,
+    connectedNodeCount: hierarchyProfile.connectedNodeCount,
+    maxHierarchyDepth: hierarchyProfile.maxHierarchyDepth,
     orderedSequenceLength,
     isProceduralDocument,
     isChronologicalDocument,
@@ -202,17 +281,25 @@ export function scoreDocumentSuitability(canonicalIR = {}) {
     scores.comparison += Math.min(profile.comparisonRelationCount * 0.04, 0.15);
   }
 
-  if (profile.hierarchicalRelationCount > 0) {
-    scores.mindmap += 0.5;
-    scores.conceptTree += 0.4;
+  if (profile.isHierarchicalDocument) {
+    scores.mindmap += 0.4;
+    scores.conceptTree += 0.35;
 
-    scores.mindmap += Math.min(profile.hierarchicalRelationCount * 0.03, 0.2);
-    scores.conceptTree += Math.min(profile.hierarchicalRelationCount * 0.04, 0.2);
-  }
+    scores.mindmap += Math.min(profile.nodeCount / 10, 0.2);
+    scores.conceptTree += Math.min(profile.nodeCount / 12, 0.15);
 
-  if (profile.branchingHierarchy) {
-    scores.mindmap += 0.25;
-    scores.conceptTree += 0.2;
+    scores.mindmap += Math.min(profile.maxHierarchyDepth / 4, 0.2);
+    scores.conceptTree += Math.min(profile.maxHierarchyDepth / 5, 0.15);
+
+    scores.mindmap += Math.min(profile.branchingFactor / 3, 0.2);
+    scores.conceptTree += Math.min(profile.branchingFactor / 4, 0.15);
+
+    const connectivityRatio = profile.nodeCount > 0
+      ? profile.connectedNodeCount / profile.nodeCount
+      : 0;
+
+    scores.mindmap += Math.min(connectivityRatio * 0.25, 0.2);
+    scores.conceptTree += Math.min(connectivityRatio * 0.2, 0.15);
   }
 
   if (profile.nodeCount > 0) {

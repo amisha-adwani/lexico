@@ -23,7 +23,7 @@ export default function toMindmapViewModel(canonicalIR) {
   const rootNode = sortByImportance(nodes)[0];
   const hierarchyTree = buildHierarchyTree(rootNode, nodes, relations, sourceMap);
 
-  const convertToMindmapFormat = (node) => {
+  const convertToMindmapFormat = (node, depth = 0) => {
     return {
       label: node.label,
       nodeId: node.id,
