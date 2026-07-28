@@ -75,7 +75,7 @@ export function isValidViewModel(viewType, model) {
         {
           const points = Array.isArray(model.points) ? model.points.length : 0;
           const valid = points >= 2;
-          const quality = valid ? Math.min(points / 10, 1) : 0;
+          const quality = valid ? scoreTimelineQuality(model.points) : 0;
           return { valid, qualityScore: quality, error: valid ? null : 'timeline requires at least 2 points' };
         }
 
@@ -168,6 +168,72 @@ export function isValidViewModel(viewType, model) {
   } catch (err) {
     return { valid: false, qualityScore: 0, error: `validation error: ${err?.message || String(err)}` };
   }
+}
+
+function isValidTimestampString(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const looksIso =
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(trimmed);
+  return looksIso && !Number.isNaN(Date.parse(trimmed));
+}
+
+function parseOrdinalLabel(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(step|phase)\s+(\d+)\b/i);
+  if (!match) return null;
+  return { kind: match[1].toLowerCase(), index: Number(match[2]) };
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function scoreTimelineQuality(points = []) {
+  const safePoints = Array.isArray(points) ? points : [];
+  const total = safePoints.length;
+  if (total === 0) return 0;
+
+  const pointScore = Math.min(total / 10, 1);
+
+  const timestampCount = safePoints.reduce((count, point) => {
+    const ts = point?.timestamp;
+    return count + (typeof ts === 'string' && ts.trim() ? 1 : 0);
+  }, 0);
+  const timestampCoverage = timestampCount / total;
+  const timestampCoverageScore = clamp01(timestampCoverage * 1.2);
+
+  const realDateCount = safePoints.reduce((count, point) => {
+    return count + (isValidTimestampString(point?.timestamp) ? 1 : 0);
+  }, 0);
+  const chronologicalCoverage = realDateCount / total;
+  const chronologicalScore = clamp01(chronologicalCoverage * 1.5);
+
+  const orderedEntriesInOrder = safePoints
+    .slice()
+    .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0))
+    .map(point => parseOrdinalLabel(point?.timestamp))
+    .filter(Boolean);
+
+  const orderedRatio = orderedEntriesInOrder.length / total;
+  let orderedConsistency = 0;
+  if (orderedEntriesInOrder.length >= 2) {
+    let expected = 1;
+    let matches = 0;
+    orderedEntriesInOrder.forEach(entry => {
+      if (entry.index === expected) {
+        matches += 1;
+        expected += 1;
+      }
+    });
+    orderedConsistency = matches / orderedEntriesInOrder.length;
+  }
+
+  const orderedScore = clamp01(Math.min(orderedRatio * 1.2, 1) * (0.6 + 0.4 * orderedConsistency));
+  const semanticTimeScore = Math.max(chronologicalScore, orderedScore);
+
+  return clamp01(0.25 * pointScore + 0.35 * timestampCoverageScore + 0.4 * semanticTimeScore);
 }
 
 function safeTransform(canonicalIR, viewType) {

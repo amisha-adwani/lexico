@@ -57,7 +57,13 @@ function cleanDocument(document = {}) {
 }
 
 function isValidTimestamp(value) {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  // Keep timestamp checks strict (ISO-like) to avoid accidental parsing of ordinal labels (e.g., "Step 1").
+  const looksIso =
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(trimmed);
+  return looksIso && !Number.isNaN(Date.parse(trimmed));
 }
 
 function countRelations(relations, types) {
@@ -266,6 +272,21 @@ export function scoreDocumentSuitability(canonicalIR = {}) {
   if (profile.timelineSequenceCount > 0) {
     scores.timeline += 0.6;
     scores.timeline += Math.min(profile.timelineSequenceCount * 0.08, 0.25);
+  }
+
+  // Procedural documents can also be meaningfully represented as an ordered timeline (Step 1, Phase 1, ...),
+  // even when timestamps are not present.
+  if (profile.processSequenceCount > 0) {
+    scores.timeline += 0.35;
+    scores.timeline += Math.min(profile.processSequenceCount * 0.05, 0.15);
+  }
+
+  if (profile.workflowRelationCount > 0) {
+    scores.timeline += Math.min(profile.workflowRelationCount * 0.02, 0.1);
+  }
+
+  if (profile.orderedSequenceLength > 2) {
+    scores.timeline += Math.min(profile.orderedSequenceLength / 20, 0.12);
   }
 
   if (profile.nodesWithTime > 0) {

@@ -29,11 +29,58 @@ import {
   failedStageResult,
 } from "./stageUtils.js";
 
+const MAX_EMPTY_RESPONSE_RETRIES = 2;
+const EMPTY_RESPONSE_BACKOFF_MS = 500;
+
+function estimateTokenCount(text = "") {
+  if (typeof text !== "string" || !text.length) return 0;
+  return Math.ceil(text.length / 4);
+}
+
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== "object") {
+    return { promptTokens: null, completionTokens: null, totalTokens: null };
+  }
+
+  const promptTokens =
+    usage.prompt_tokens ??
+    usage.input_tokens ??
+    usage.promptTokenCount ??
+    usage.promptTokens ??
+    null;
+  const completionTokens =
+    usage.completion_tokens ??
+    usage.output_tokens ??
+    usage.candidatesTokenCount ??
+    usage.completionTokens ??
+    null;
+  const totalTokens =
+    usage.total_tokens ??
+    usage.totalTokenCount ??
+    usage.totalTokens ??
+    (Number.isFinite(promptTokens) && Number.isFinite(completionTokens)
+      ? promptTokens + completionTokens
+      : null);
+
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+function getResponsePreview(text) {
+  if (typeof text !== "string") return "";
+  return text.slice(0, 500);
+}
+
+function isEmptyModelResponse(value) {
+  return typeof value !== "string" || value.trim().length === 0;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default async function educationalPlannerStage(context) {
   const stageStart = nowMs();
   const metrics = [];
-  console.log(
-  JSON.stringify('knowledge model',context.knowledgeModel, null, 2));
 
   if (!context?.knowledgeModel || typeof context.knowledgeModel !== "object") {
     const pipelineResult = buildFailureResult({
@@ -60,31 +107,123 @@ export default async function educationalPlannerStage(context) {
   }
 
   const promptStart = nowMs();
+  const knowledgeModelJson = JSON.stringify(context.knowledgeModel || {});
+  const knowledgeModelChars = knowledgeModelJson.length;
+  const knowledgeModelEstimatedTokens = estimateTokenCount(knowledgeModelJson);
   const plannerPrompt = buildEducationalPlannerPrompt({
     knowledgeModel: context.knowledgeModel,
   });
+  const plannerPromptChars = plannerPrompt?.length || 0;
+  const plannerPromptEstimatedTokens = estimateTokenCount(plannerPrompt || "");
   metrics.push({
     stage: "educational_planner_prompt",
     durationMs: nowMs() - promptStart,
-    inputSize: plannerPrompt?.length || 0,
+    inputSize: plannerPromptChars,
     outputSize: 0,
     warnings: [],
     validationResult: "ok",
+    details: [
+      {
+        knowledgeModelChars,
+        knowledgeModelEstimatedTokens,
+        plannerPromptChars,
+        plannerPromptEstimatedTokens,
+        totalPromptEstimatedTokens: plannerPromptEstimatedTokens,
+      },
+    ],
   });
 
   let educationalPlannerRaw;
-  try {
-    const aiStart = nowMs();
-    educationalPlannerRaw = await aiClient.generateContent(plannerPrompt);
-    metrics.push({
-      stage: "educational_planner",
-      durationMs: nowMs() - aiStart,
-      inputSize: plannerPrompt?.length || 0,
-      outputSize: educationalPlannerRaw?.length || 0,
-      warnings: [],
-      validationResult: "ok",
-    });
-  } catch (error) {
+  let plannerResponseDetails = null;
+  let emptyResponseAttempts = 0;
+  let generationError = null;
+
+  for (let attempt = 1; attempt <= MAX_EMPTY_RESPONSE_RETRIES + 1; attempt += 1) {
+    try {
+      const aiStart = nowMs();
+      plannerResponseDetails = await aiClient.generateContentDetailed(plannerPrompt);
+      educationalPlannerRaw = plannerResponseDetails?.responseText ?? "";
+
+      const usage = normalizeUsage(plannerResponseDetails?.usage);
+      const isEmpty = isEmptyModelResponse(educationalPlannerRaw);
+      const finishReason = plannerResponseDetails?.finishReason || null;
+      const responseState = plannerResponseDetails?.responseState || (isEmpty ? "empty_text" : "ok");
+      const candidateCount = Array.isArray(plannerResponseDetails?.candidates)
+        ? plannerResponseDetails.candidates.length
+        : 0;
+      const partCount = Array.isArray(plannerResponseDetails?.responseParts)
+        ? plannerResponseDetails.responseParts.length
+        : 0;
+
+      metrics.push({
+        stage: attempt === 1 ? "educational_planner" : `educational_planner_attempt_${attempt}`,
+        durationMs: nowMs() - aiStart,
+        inputSize: plannerPromptChars,
+        outputSize: educationalPlannerRaw?.length || 0,
+        warnings: isEmpty ? [responseState] : [],
+        validationResult: isEmpty ? "failed" : "ok",
+        details: [
+          {
+            attempt,
+            model: plannerResponseDetails?.model || null,
+            temperature: plannerResponseDetails?.temperature ?? null,
+            maxOutputTokens: plannerResponseDetails?.maxOutputTokens ?? null,
+            timeoutMs: plannerResponseDetails?.timeoutMs ?? null,
+            requestId: plannerResponseDetails?.requestId || null,
+            finishReason,
+            promptTokens: usage.promptTokens,
+            completionTokens: usage.completionTokens,
+            totalTokens: usage.totalTokens,
+            estimatedPromptTokens: plannerResponseDetails?.estimatedPromptTokens ?? plannerPromptEstimatedTokens,
+            responseLength: educationalPlannerRaw?.length || 0,
+            candidateCount,
+            partCount,
+            responseState,
+            rawResponsePreview: getResponsePreview(educationalPlannerRaw),
+            responsePreview: getResponsePreview(JSON.stringify(plannerResponseDetails?.response || {})),
+            candidatesPreview: getResponsePreview(JSON.stringify(plannerResponseDetails?.candidates || [])),
+            partsPreview: getResponsePreview(JSON.stringify(plannerResponseDetails?.responseParts || [])),
+          },
+        ],
+      });
+
+      if (!isEmpty) {
+        generationError = null;
+        break;
+      }
+
+      emptyResponseAttempts += 1;
+      if (attempt <= MAX_EMPTY_RESPONSE_RETRIES) {
+        const backoffMs = EMPTY_RESPONSE_BACKOFF_MS * Math.pow(2, attempt - 1);
+        await sleep(backoffMs);
+      }
+    } catch (error) {
+      generationError = error;
+      const pipelineResult = buildFailureResult({
+        errorType: "educational_planner_generation_failed",
+        stage: "Educational Planner",
+        reason: "Failed to generate educational blueprint",
+        options: {
+          recoverable: true,
+          suggestedFix: "Retry with reduced input complexity.",
+          details: [error?.message || String(error)],
+          statusCode: 502,
+        },
+        payload: { raw: educationalPlannerRaw },
+      });
+      return failedStageResult(
+        "educationalPlannerStage",
+        nowMs() - stageStart,
+        pipelineResult,
+        [],
+        [],
+        null,
+        metrics
+      );
+    }
+  }
+
+  if (generationError) {
     const pipelineResult = buildFailureResult({
       errorType: "educational_planner_generation_failed",
       stage: "Educational Planner",
@@ -92,7 +231,7 @@ export default async function educationalPlannerStage(context) {
       options: {
         recoverable: true,
         suggestedFix: "Retry with reduced input complexity.",
-        details: [error?.message || String(error)],
+        details: [generationError?.message || String(generationError)],
         statusCode: 502,
       },
       payload: { raw: educationalPlannerRaw },
@@ -102,6 +241,46 @@ export default async function educationalPlannerStage(context) {
       nowMs() - stageStart,
       pipelineResult,
       [],
+      [],
+      null,
+      metrics
+    );
+  }
+
+  if (isEmptyModelResponse(educationalPlannerRaw)) {
+    const responseState = plannerResponseDetails?.responseState || "empty_text";
+    const finishReason = plannerResponseDetails?.finishReason || "unknown";
+    const candidateCount = Array.isArray(plannerResponseDetails?.candidates)
+      ? plannerResponseDetails.candidates.length
+      : 0;
+    const usage = normalizeUsage(plannerResponseDetails?.usage);
+    const pipelineResult = buildFailureResult({
+      errorType: "educational_planner_empty_response",
+      stage: "Educational Planner",
+      reason: "Model returned no response text",
+      options: {
+        recoverable: true,
+        suggestedFix: "Retry with smaller prompt or higher max output tokens.",
+        details: [
+          `response_state=${responseState}`,
+          `finish_reason=${finishReason}`,
+          `candidates=${candidateCount}`,
+          `retries=${emptyResponseAttempts}`,
+          `prompt_tokens=${usage.promptTokens ?? "unknown"}`,
+          `completion_tokens=${usage.completionTokens ?? "unknown"}`,
+        ],
+        statusCode: 502,
+      },
+      payload: {
+        raw: educationalPlannerRaw,
+        providerResponse: plannerResponseDetails?.response || null,
+      },
+    });
+    return failedStageResult(
+      "educationalPlannerStage",
+      nowMs() - stageStart,
+      pipelineResult,
+      [responseState],
       [],
       null,
       metrics
@@ -144,6 +323,17 @@ export default async function educationalPlannerStage(context) {
   }
 
   let educationalBlueprint = parseResult.parsed;
+
+  if (Array.isArray(educationalBlueprint.learningSequence)) {
+    educationalBlueprint.learningSequence = educationalBlueprint.learningSequence.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+      if ((!item.concept || typeof item.concept !== "string" || !item.concept.trim()) && typeof item.label === "string") {
+        return { ...item, concept: item.label };
+      }
+      return item;
+    });
+  }
+
   const validationStart = nowMs();
   const validation = validateEducationalBlueprint(educationalBlueprint);
   metrics.push({
@@ -214,7 +404,6 @@ export default async function educationalPlannerStage(context) {
     "educationalPlannerStage",
     {
       educationalBlueprint,
-      educationalPlannerRaw,
       educationalPlannerRaw,
     },
     nowMs() - stageStart,

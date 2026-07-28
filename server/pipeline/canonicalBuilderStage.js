@@ -8,6 +8,95 @@ import {
   failedStageResult,
 } from "./stageUtils.js";
 
+function normalizeKey(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase().replace(/\s+/g, " ")
+    : "";
+}
+
+function firstSentence(text) {
+  if (typeof text !== "string") return "";
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(.+?[.!?])(\s|$)/);
+  return (match ? match[1] : trimmed).trim();
+}
+
+function buildKnowledgeSummaryIndex(knowledgeModel) {
+  const index = new Map();
+  if (!knowledgeModel || typeof knowledgeModel !== "object" || Array.isArray(knowledgeModel)) return index;
+
+  const concepts = Array.isArray(knowledgeModel.concepts) ? knowledgeModel.concepts : [];
+  for (const concept of concepts) {
+    if (!concept || typeof concept !== "object" || Array.isArray(concept)) continue;
+    const name =
+      concept.name ||
+      concept.concept ||
+      concept.label ||
+      concept.term ||
+      "";
+    const aliases = Array.isArray(concept.aliases) ? concept.aliases : [];
+    const shortDescription =
+      concept.shortDescription ||
+      concept.description ||
+      concept.summary ||
+      "";
+    const fullDescription =
+      concept.fullDescription ||
+      concept.details ||
+      "";
+    const summary = (typeof shortDescription === "string" && shortDescription.trim())
+      ? shortDescription.trim()
+      : firstSentence(fullDescription);
+
+    const keys = [name, ...aliases]
+      .map(normalizeKey)
+      .filter(Boolean);
+
+    for (const key of keys) {
+      if (!index.has(key) && summary) {
+        index.set(key, summary);
+      }
+    }
+  }
+
+  const definitions = Array.isArray(knowledgeModel.definitions) ? knowledgeModel.definitions : [];
+  for (const def of definitions) {
+    if (!def || typeof def !== "object" || Array.isArray(def)) continue;
+    const term = def.term || def.label || "";
+    const definition = def.definition || def.description || "";
+    const key = normalizeKey(term);
+    const summary = firstSentence(definition);
+    if (key && summary && !index.has(key)) {
+      index.set(key, summary);
+    }
+  }
+
+  return index;
+}
+
+function enrichCanonicalNodeSummaries(canonicalIR, knowledgeModel) {
+  if (!canonicalIR || typeof canonicalIR !== "object" || Array.isArray(canonicalIR)) return canonicalIR;
+  if (!Array.isArray(canonicalIR.nodes) || canonicalIR.nodes.length === 0) return canonicalIR;
+
+  const summaryIndex = buildKnowledgeSummaryIndex(knowledgeModel);
+  if (summaryIndex.size === 0) return canonicalIR;
+
+  canonicalIR.nodes = canonicalIR.nodes.map((node) => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return node;
+    const hasSummary = typeof node.summary === "string" && node.summary.trim();
+    if (hasSummary) return node;
+
+    const key = normalizeKey(node.label);
+    const summary = key ? summaryIndex.get(key) : "";
+    if (!summary) return node;
+
+    return { ...node, summary };
+  });
+
+  return canonicalIR;
+}
+
 export default async function canonicalBuilderStage(context) {
   const stageStart = nowMs();
   const metrics = [];
@@ -77,7 +166,7 @@ export default async function canonicalBuilderStage(context) {
       success: true,
       canonicalRaw,
       canonicalParsed: parseResult.parsed,
-      canonicalIR: parseResult.parsed,
+      canonicalIR: enrichCanonicalNodeSummaries(parseResult.parsed, context.knowledgeModel),
     };
   };
 
@@ -115,7 +204,12 @@ export default async function canonicalBuilderStage(context) {
     );
   }
 
-  const failureSource = firstAttempt.pipelineResult || retryAttempt.pipelineResult || {
+  const existingPipelineResult = firstAttempt.pipelineResult || retryAttempt.pipelineResult;
+  if (existingPipelineResult) {
+    return failedStageResult("canonicalBuilderStage", nowMs() - stageStart, existingPipelineResult, [], [], null, metrics);
+  }
+
+  const failureSource = {
     errorType: firstAttempt.parseResult?.error || retryAttempt.parseResult?.error || "parse_failed",
     stage: "Canonical Validation",
     reason: "Failed to parse Canonical IR JSON",
