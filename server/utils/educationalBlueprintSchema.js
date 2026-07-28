@@ -47,6 +47,7 @@ export const EducationalBlueprintSchema = {
   learningSequence: [
     {
       order: 1,
+      concept: "",
       label: "",
       conceptsInvolved: [],
       rationale: "",
@@ -152,8 +153,10 @@ export function validateEducationalBlueprint(blueprint) {
       if (typeof item.label !== "string" || !item.label.trim()) {
         warnings.push(`learningSequence[${index}] label missing`);
       }
-      if (typeof item.concept !== "string" || !item.concept.trim()) {
-        warnings.push(`learningSequence[${index}] concept missing`);
+      const hasConcept = typeof item.concept === "string" && item.concept.trim();
+      const hasLabel = typeof item.label === "string" && item.label.trim();
+      if (!hasConcept && !hasLabel) {
+        warnings.push(`learningSequence[${index}] concept or label missing`);
       }
     });
   }
